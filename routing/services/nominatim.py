@@ -9,6 +9,8 @@ from dataclasses import dataclass
 import requests
 from django.conf import settings
 
+from routing.services.request_metrics import count_external_call
+
 
 @dataclass(frozen=True)
 class NominatimPlace:
@@ -23,6 +25,7 @@ class NominatimError(Exception):
 
 def search(query: str, country_code: str = "us") -> NominatimPlace | None:
     """Return the best match for `query` within one country, or None if nothing matches."""
+    count_external_call()
     try:
         response = requests.get(
             f"{settings.NOMINATIM_BASE_URL}/search",

@@ -15,6 +15,7 @@ from django.conf import settings
 from urllib3.exceptions import ReadTimeoutError
 
 from routing.services import polyline
+from routing.services.request_metrics import count_external_call
 
 METERS_PER_MILE = 1609.344
 CHUNK_BYTES = 64 * 1024
@@ -69,6 +70,7 @@ def fetch_routes(start: tuple[float, float], finish: tuple[float, float]) -> lis
     limit = settings.HTTP_TIMEOUT_SECONDS
     too_slow = f"The routing provider did not answer within {limit:g} s."
     deadline = monotonic() + limit
+    count_external_call()
     try:
         with requests.get(
             url,
