@@ -3,6 +3,7 @@ import io
 import zipfile
 
 import pytest
+import responses
 from django.core.management import call_command
 
 PLACES_ZIP = "2024_Gaz_place_national.zip"
@@ -107,3 +108,34 @@ def test_writes_the_us_places_file_from_the_census_places_only(data_dir, setting
         {"name": "St. Louis city", "state": "MO", "lat": "38.635", "lon": "-90.244"},
         {"name": "Kansas City city", "state": "MO", "lat": "39.125", "lon": "-94.551"},
     ]
+
+
+GAZETTEER_URL = "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/"
+
+
+@responses.activate
+def test_downloads_the_gazetteer_into_the_cache_when_missing(data_dir, settings):
+    for name in (PLACES_ZIP, COUSUBS_ZIP):
+        (settings.GAZETTEER_CACHE_DIR / name).unlink()
+    settings.GAZETTEER_CACHE_DIR.rmdir()
+    responses.get(
+        GAZETTEER_URL + PLACES_ZIP, body=zipped("2024_Gaz_place_national.txt", PLACES_TXT)
+    )
+    responses.get(
+        GAZETTEER_URL + COUSUBS_ZIP, body=zipped("2024_Gaz_cousubs_national.txt", COUSUBS_TXT)
+    )
+    write_prices(settings, ("Smithtown", "NY"))
+
+    call_command("build_city_coords", stdout=io.StringIO())
+
+    assert (settings.GAZETTEER_CACHE_DIR / PLACES_ZIP).exists()
+    assert read_csv(settings.CITY_COORDS_FILE)[0]["source"] == "census"
+
+
+@responses.activate
+def test_uses_the_cached_gazetteer_without_downloading(data_dir, settings):
+    write_prices(settings, ("Smithtown", "NY"))
+
+    call_command("build_city_coords", stdout=io.StringIO())
+
+    assert len(responses.calls) == 0
