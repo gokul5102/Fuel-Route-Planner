@@ -99,6 +99,8 @@ def fetch_routes(start: tuple[float, float], finish: tuple[float, float]) -> lis
         raise RoutingError(
             f"The routing provider failed (HTTP {response.status_code}, {osrm_code}).", osrm_code
         )
+    if not body["routes"]:  # "Ok", but nothing to drive
+        raise NoRoute("The routing provider found no Route between the points.")
     return [
         RoutedPath(
             points=polyline.decode(route["geometry"]),

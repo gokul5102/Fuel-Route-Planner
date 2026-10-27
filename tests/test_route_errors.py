@@ -123,6 +123,12 @@ def test_osrm_finding_no_road_between_the_points_is_no_route(client, osrm, osrm_
     assert error["details"] == {"provider_code": osrm_code}
 
 
+def test_osrm_answering_ok_with_no_routes_is_no_route(client, osrm):
+    osrm.get(OSRM_URL, json={"code": "Ok", "routes": [], "waypoints": []})
+
+    error_of(plan(client), 422, "NO_ROUTE")
+
+
 @pytest.mark.parametrize(
     "failure",
     [
