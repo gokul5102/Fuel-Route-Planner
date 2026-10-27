@@ -1,6 +1,7 @@
 """The OSRM routing client: one call returns each Route (the fastest plus OSRM's alternatives)
 with its full geometry, distance and duration.
 
+The geometry comes as polyline6 (about a fifth the size of GeoJSON) and is decoded here.
 The public demo server allows at most 1 request per second and has no uptime
 guarantee, so there are no retries and a short timeout. Note OSRM wants lon,lat.
 """
@@ -9,6 +10,8 @@ from dataclasses import dataclass
 
 import requests
 from django.conf import settings
+
+from routing.services import polyline
 
 METERS_PER_MILE = 1609.344
 
@@ -62,7 +65,7 @@ def fetch_routes(start: tuple[float, float], finish: tuple[float, float]) -> lis
     try:
         response = requests.get(
             url,
-            params={"overview": "full", "geometries": "geojson", "alternatives": "true"},
+            params={"overview": "full", "geometries": "polyline6", "alternatives": "true"},
             timeout=settings.HTTP_TIMEOUT_SECONDS,
         )
         body = response.json()
@@ -82,7 +85,7 @@ def fetch_routes(start: tuple[float, float], finish: tuple[float, float]) -> lis
         )
     return [
         RoutedPath(
-            points=[(lat, lon) for lon, lat in route["geometry"]["coordinates"]],
+            points=polyline.decode(route["geometry"]),
             distance_miles=route["distance"] / METERS_PER_MILE,
             duration_hours=route["duration"] / 3600,
         )

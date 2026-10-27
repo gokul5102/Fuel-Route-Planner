@@ -19,6 +19,7 @@ from django.conf import settings
 from routing.services.corridor import stations_in_corridor
 from routing.services.optimizer import CandidateStation, FuelPlanError, plan_fuel_stops
 from routing.services.osrm import METERS_PER_MILE
+from routing.services.polyline import decode
 from routing.services.station_index import IndexedStation, StationIndex
 from routing.services.stations import clean_stations, read_city_coords, read_price_file
 
@@ -132,7 +133,7 @@ def chicago_to_los_angeles() -> tuple[float, list[CandidateStation]]:
     )
     route = json.loads(OSRM_FIXTURE.read_text())["routes"][0]
     distance = route["distance"] / METERS_PER_MILE
-    points = [(lat, lon) for lon, lat in route["geometry"]["coordinates"]]
+    points = decode(route["geometry"])
     on_route = stations_in_corridor(points, index, corridor_miles=8, route_miles=distance)
     return distance, [
         CandidateStation(m.station.opis_id, m.mile_marker, m.station.price) for m in on_route

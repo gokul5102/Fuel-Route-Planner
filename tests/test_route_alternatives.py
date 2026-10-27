@@ -19,6 +19,7 @@ import pytest
 import responses
 
 from routing.models import Station
+from tests.polyline_encoding import encode
 
 OSRM_FIXTURE = Path(__file__).parent / "fixtures" / "osrm_chicago_los_angeles_alternatives.json"
 OSRM_URL = "https://osrm.test/route/v1/driving/-87.6298,41.8781;-118.2437,34.0522"
@@ -141,7 +142,7 @@ NORTHERN_STATION = (2, "Northern", "NE", 40.5, -99.8)
 
 def osrm_route(points, miles: float, hours: float) -> dict:
     return {
-        "geometry": {"type": "LineString", "coordinates": [[lon, lat] for lat, lon in points]},
+        "geometry": encode(points),
         "distance": miles * 1609.344,
         "duration": hours * 3600,
         "legs": [],
