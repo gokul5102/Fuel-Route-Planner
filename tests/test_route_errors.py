@@ -6,6 +6,7 @@ OSRM is mocked: with the recorded Chicago -> Los Angeles Route (2,018.03 miles),
 import io
 import itertools
 import json
+import time
 from decimal import Decimal
 from pathlib import Path
 
@@ -185,7 +186,7 @@ def test_osrm_taking_longer_than_the_limit_in_total_is_a_routing_provider_timeou
     # Every single read is fast, but the clock says the whole download has taken 10.5 s.
     settings.HTTP_TIMEOUT_SECONDS = 10
     clock = itertools.chain([1000.0], itertools.repeat(1010.5))
-    monkeypatch.setattr("routing.services.osrm.monotonic", lambda: next(clock))
+    monkeypatch.setattr("routing.services.http.monotonic", lambda: next(clock))
     osrm.get(OSRM_URL, json=json.loads(OSRM_FIXTURE.read_text()))
 
     error = error_of(plan(client), 504, "ROUTING_PROVIDER_TIMEOUT")
@@ -214,6 +215,42 @@ def test_osrm_stalling_in_the_middle_of_the_body_is_a_routing_provider_timeout(c
     osrm.get(OSRM_URL, body=io.BufferedReader(StallingBody()))
 
     error_of(plan(client), 504, "ROUTING_PROVIDER_TIMEOUT")
+
+
+class SlowBody(io.RawIOBase):
+    """A response body that sends "[" at once, then takes `seconds` to send "]".
+
+    No single read times out, so only a limit on the whole download stops it.
+    """
+
+    def __init__(self, seconds: float) -> None:
+        self.seconds = seconds
+        self.parts = [b"[", b"]"]
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, buffer) -> int:
+        if not self.parts:
+            return 0
+        if len(self.parts) == 1:
+            time.sleep(self.seconds)
+        part = self.parts.pop(0)
+        buffer[: len(part)] = part
+        return len(part)
+
+
+def test_osrm_is_given_up_on_once_the_total_limit_passes_even_while_a_read_waits(
+    client, osrm, settings
+):
+    settings.HTTP_TIMEOUT_SECONDS = 0.2
+    osrm.get(OSRM_URL, body=io.BufferedReader(SlowBody(seconds=2)))
+
+    started = time.monotonic()
+    error = error_of(plan(client), 504, "ROUTING_PROVIDER_TIMEOUT")
+
+    assert time.monotonic() - started < 1  # not the 2 s the read takes
+    assert "0.2 s" in error["message"]
 
 
 def test_an_unexpected_failure_still_uses_the_envelope(client, monkeypatch):
