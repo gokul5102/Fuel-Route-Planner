@@ -104,3 +104,25 @@ def test_the_route_not_chosen_is_summarised_with_its_fuel_cost(client, db, osrm)
             "failure_code": None,
         }
     ]
+
+
+def test_a_route_that_cannot_be_fuelled_is_skipped_and_summarised_with_its_failure(
+    client, db, osrm
+):
+    add_stations([CHICAGO_STATION], "4.00")
+    add_stations(I80_STATIONS, "3.50")  # nothing on I-40: it runs dry at Mile marker 500
+
+    response = plan(client)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["route"] == {"distance_miles": 2018.03, "duration_hours": 35.36}
+    assert body["total_fuel_cost"] == 717.34
+    assert body["alternatives"] == [
+        {
+            "distance_miles": 2124.37,
+            "duration_hours": 37.26,
+            "total_fuel_cost": None,
+            "failure_code": "UNREACHABLE",
+        }
+    ]

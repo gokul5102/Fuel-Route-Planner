@@ -10,7 +10,7 @@ from django.conf import settings
 
 from routing.services.corridor import stations_in_corridor
 from routing.services.locations import ResolvedLocation, check_distinct, resolve_location
-from routing.services.optimizer import CandidateStation, plan_fuel_stops
+from routing.services.optimizer import CandidateStation, FuelPlanError, plan_fuel_stops
 from routing.services.osrm import RoutedPath, fetch_routes
 from routing.services.station_index import IndexedStation, StationIndex, get_station_index
 
@@ -60,10 +60,11 @@ class RoutePlan:
 
 @dataclass(frozen=True)
 class RouteOption:
-    """One Route OSRM offered, with its fuel plan."""
+    """One Route OSRM offered: its fuel plan, or the reason it cannot be fuelled."""
 
     route: RoutedPath
-    plan: RoutePlan
+    plan: RoutePlan | None
+    failure: FuelPlanError | None = None
 
 
 @dataclass(frozen=True)
@@ -90,11 +91,22 @@ def choose_cheapest_route(
 ) -> tuple[RoutePlan, list[RouteOption]]:
     """Plan every Route OSRM offered; the one with the cheapest fuel wins.
 
+    Routes that cannot be fuelled are skipped; if none can, raises the fastest Route's failure.
     Returns the winner's plan and the other Routes (the alternatives).
     """
-    options = [RouteOption(route, plan_route(route, index, vehicle)) for route in routes]
-    winner = min(options, key=lambda option: option.plan.total_cost)
+    options = [_plan_option(route, index, vehicle) for route in routes]
+    fuelled = [option for option in options if option.plan is not None]
+    if not fuelled:
+        raise min(options, key=lambda option: option.route.duration_hours).failure
+    winner = min(fuelled, key=lambda option: option.plan.total_cost)
     return winner.plan, [option for option in options if option is not winner]
+
+
+def _plan_option(route: RoutedPath, index: StationIndex, vehicle: Vehicle) -> RouteOption:
+    try:
+        return RouteOption(route, plan_route(route, index, vehicle))
+    except FuelPlanError as failure:
+        return RouteOption(route, plan=None, failure=failure)
 
 
 def plan_route(route: RoutedPath, index: StationIndex, vehicle: Vehicle) -> RoutePlan:

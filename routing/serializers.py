@@ -57,8 +57,8 @@ def _alternative(option: RouteOption) -> dict:
     """A Route not chosen, as a summary only: its fuel cost, or why it cannot be fuelled."""
     return {
         **_route(option.route),
-        "total_fuel_cost": float(option.plan.total_cost),
-        "failure_code": None,
+        "total_fuel_cost": float(option.plan.total_cost) if option.plan else None,
+        "failure_code": option.failure.code if option.failure else None,
     }
 
 
