@@ -2,13 +2,16 @@
 
 1. Download the Census Gazetteer (places + county subdivisions) unless already cached.
 2. Write the trimmed US places file used for "City, ST" lookups.
-3. Match every unique city/state in the price file locally.
-4. Append one row per city to the city coordinates file.
+3. Match every unique city/state in the price file locally; send the rest (hard US
+   names and the Canadian provinces) to Nominatim, one request per second.
+4. Write one row per city to the city coordinates file as each result arrives.
 """
 
 import csv
 import io
+import time
 import zipfile
+from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -16,6 +19,7 @@ import requests
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+from routing.services import nominatim
 from routing.services.places import PlaceIndex
 
 GAZETTEER_URL = "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/"
@@ -23,6 +27,8 @@ PLACES_ZIP = "2024_Gaz_place_national.zip"
 COUSUBS_ZIP = "2024_Gaz_cousubs_national.zip"
 
 CITY_COORDS_COLUMNS = ["city", "state", "lat", "lon", "source"]
+CANADIAN_PROVINCES = {"AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"}
+NOMINATIM_INTERVAL_SECONDS = 1.0  # Nominatim usage policy: at most 1 request per second
 
 
 def download_once(url: str, path: Path) -> None:
@@ -51,10 +57,10 @@ def read_gazetteer(zip_path: Path) -> Iterator[tuple[str, str, float, float]]:
         yield row["NAME"], row["USPS"], float(row["INTPTLAT"]), float(row["INTPTLONG"])
 
 
-def read_price_file_cities(path: Path) -> list[tuple[str, str]]:
-    """Unique (city, state) pairs from the price file, whitespace trimmed, sorted."""
+def read_price_file_cities(path: Path) -> Counter[tuple[str, str]]:
+    """Price-file row count per (city, state), whitespace trimmed."""
     with open(path, newline="", encoding="utf-8") as f:
-        return sorted({(row["City"].strip(), row["State"].strip()) for row in csv.DictReader(f)})
+        return Counter((row["City"].strip(), row["State"].strip()) for row in csv.DictReader(f))
 
 
 class Command(BaseCommand):
@@ -73,20 +79,43 @@ class Command(BaseCommand):
         for subdivision in read_gazetteer(settings.GAZETTEER_CACHE_DIR / COUSUBS_ZIP):
             index.add(*subdivision)
 
-        counts = {"census": 0}
+        price_rows = read_price_file_cities(settings.PRICE_FILE)
+        self.nominatim_calls = 0
         with open(settings.CITY_COORDS_FILE, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(CITY_COORDS_COLUMNS)
-            for city, state in read_price_file_cities(settings.PRICE_FILE):
-                coords = index.find(city, state)
-                if coords:
-                    writer.writerow([city, state, *coords, "census"])
-                    counts["census"] += 1
+            for city, state in sorted(price_rows):
+                coords, source = self.locate(index, city, state)
+                writer.writerow([city, state, *coords, source])
+                f.flush()  # an interrupted run keeps every city written so far
 
-        us_total = counts["census"]
-        self.stdout.write(f"census: {counts['census']}")
+        self.print_summary(price_rows)
+
+    def locate(self, index: PlaceIndex, city: str, state: str):
+        coords = index.find(city, state)
+        if coords:
+            return coords, "census"
+        if self.nominatim_calls:
+            time.sleep(NOMINATIM_INTERVAL_SECONDS)
+        self.nominatim_calls += 1
+        country = "ca" if state in CANADIAN_PROVINCES else "us"
+        coords = nominatim.search(f"{city}, {state}", country_code=country)
+        return coords, "nominatim"
+
+    def print_summary(self, price_rows: Counter[tuple[str, str]]) -> None:
+        with open(settings.CITY_COORDS_FILE, newline="", encoding="utf-8") as f:
+            sources = {(r["city"], r["state"]): r["source"] for r in csv.DictReader(f)}
+        for source, count in sorted(Counter(sources.values()).items()):
+            self.stdout.write(f"{source}: {count}")
+
+        us = [key for key in sources if key[1] not in CANADIAN_PROVINCES]
+        us_census = [key for key in us if sources[key] == "census"]
+        city_share = 100 * len(us_census) / max(len(us), 1)
+        row_share = (
+            100 * sum(price_rows[k] for k in us_census) / max(sum(price_rows[k] for k in us), 1)
+        )
         self.stdout.write(
-            f"{100 * counts['census'] / us_total:.1f}% of US cities matched by census"
+            f"{city_share:.1f}% of US cities ({row_share:.1f}% of US price rows) matched by census"
         )
 
     def write_us_places(self, places: list[tuple[str, str, float, float]]) -> None:

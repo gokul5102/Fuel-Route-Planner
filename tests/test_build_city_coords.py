@@ -5,6 +5,7 @@ import zipfile
 import pytest
 import responses
 from django.core.management import call_command
+from responses import matchers
 
 PLACES_ZIP = "2024_Gaz_place_national.zip"
 COUSUBS_ZIP = "2024_Gaz_cousubs_national.zip"
@@ -139,3 +140,51 @@ def test_uses_the_cached_gazetteer_without_downloading(data_dir, settings):
     call_command("build_city_coords", stdout=io.StringIO())
 
     assert len(responses.calls) == 0
+
+
+NOMINATIM_SEARCH = "https://nominatim.openstreetmap.org/search"
+
+
+@pytest.fixture(autouse=True)
+def sleeps(monkeypatch):
+    """Record the throttle's sleeps instead of waiting."""
+    calls = []
+    monkeypatch.setattr("time.sleep", calls.append)
+    return calls
+
+
+def nominatim_answers(query: str, country: str, body: list) -> None:
+    responses.get(
+        NOMINATIM_SEARCH,
+        json=body,
+        match=[
+            matchers.query_param_matcher(
+                {"q": query, "format": "json", "limit": "1", "countrycodes": country}
+            ),
+            matchers.header_matcher({"User-Agent": "test-agent/1.0"}),
+        ],
+    )
+
+
+@responses.activate
+def test_cities_census_cannot_match_fall_back_to_nominatim_one_per_second(
+    data_dir, settings, sleeps
+):
+    settings.NOMINATIM_USER_AGENT = "test-agent/1.0"
+    write_prices(settings, ("Smithtown", "NY"), ("Tiny Spot", "TX"), ("Toronto", "ON"))
+    nominatim_answers("Tiny Spot, TX", "us", [{"lat": "31.5", "lon": "-97.1"}])
+    nominatim_answers("Toronto, ON", "ca", [{"lat": "43.65", "lon": "-79.38"}])
+    out = io.StringIO()
+
+    call_command("build_city_coords", stdout=out)
+
+    rows = read_csv(settings.CITY_COORDS_FILE)
+    assert [(r["city"], r["lat"], r["lon"], r["source"]) for r in rows] == [
+        ("Smithtown", "40.86", "-73.21", "census"),
+        ("Tiny Spot", "31.5", "-97.1", "nominatim"),
+        ("Toronto", "43.65", "-79.38", "nominatim"),
+    ]
+    assert len(responses.calls) == 2
+    assert sleeps == [1.0]  # a pause before every Nominatim call after the first
+    assert "nominatim: 2" in out.getvalue()
+    assert "50.0% of US cities" in out.getvalue()
