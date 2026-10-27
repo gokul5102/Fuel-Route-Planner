@@ -116,3 +116,11 @@ MIN_RESERVE_MILES = env.float("MIN_RESERVE_MILES", default=0)
 
 PLAN_CACHE_SECONDS = env.int("PLAN_CACHE_SECONDS", default=24 * 60 * 60)
 GEOCODE_CACHE_SECONDS = env.int("GEOCODE_CACHE_SECONDS", default=30 * 24 * 60 * 60)
+
+# --- Data files (committed, except the raw download cache) -----------------------
+
+DATA_DIR = BASE_DIR / "data"
+PRICE_FILE = DATA_DIR / "fuel-prices-for-be-assessment.csv"
+US_PLACES_FILE = DATA_DIR / "us_places.csv"
+CITY_COORDS_FILE = DATA_DIR / "city_coords.csv"
+GAZETTEER_CACHE_DIR = DATA_DIR / ".cache"
