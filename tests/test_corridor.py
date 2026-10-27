@@ -94,3 +94,8 @@ def test_the_shared_index_is_built_from_the_station_table():
     assert [(m.station.opis_id, m.station.price, m.station.name) for m in matches] == [
         (42, Decimal("3.12300000"), "ON THE WAY")
     ]
+
+
+@pytest.mark.django_db
+def test_an_empty_station_table_gives_an_empty_index():
+    assert stations_in_corridor(STRAIGHT_ROUTE, get_station_index(), corridor_miles=8) == []

@@ -14,3 +14,7 @@ from django.core.asgi import get_asgi_application
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "fuelroute.settings")
 
 application = get_asgi_application()
+
+from routing.services.station_index import warm_station_index  # noqa: E402
+
+warm_station_index()  # one query, then every request uses the in-memory index

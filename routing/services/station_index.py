@@ -6,6 +6,7 @@ scipy cKDTree, and the Station details sit in a parallel tuple (row i of the tre
 the database.
 """
 
+import logging
 import threading
 from dataclasses import dataclass
 from decimal import Decimal
@@ -57,6 +58,8 @@ class StationIndex:
         return sorted({row for rows in hits for row in rows})
 
 
+logger = logging.getLogger(__name__)
+
 _index: StationIndex | None = None
 _lock = threading.Lock()
 
@@ -76,3 +79,18 @@ def reset_station_index() -> None:
     global _index
     with _lock:
         _index = None
+
+
+def warm_station_index() -> None:
+    """Build the shared index at server startup, so the first request doesn't pay for it.
+
+    If the database isn't ready yet (not migrated), log it and build on first use instead.
+    """
+    from django.db import DatabaseError
+
+    try:
+        stations = len(get_station_index().stations)
+    except DatabaseError as error:
+        logger.warning("Station index not built at startup (%s); run `make load`.", error)
+    else:
+        logger.info("Station index built: %d Stations.", stations)
