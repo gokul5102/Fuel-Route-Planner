@@ -20,3 +20,13 @@ def _block_network(monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", _blocked)
     monkeypatch.setattr(socket.socket, "connect", _blocked)
     monkeypatch.setattr(socket.socket, "connect_ex", _blocked)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_station_index():
+    """Each test sees an index built from its own Stations, never a previous test's."""
+    from routing.services.station_index import reset_station_index
+
+    reset_station_index()
+    yield
+    reset_station_index()
