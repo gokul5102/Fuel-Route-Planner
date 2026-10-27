@@ -94,3 +94,13 @@ def test_the_geojson_has_start_finish_and_numbered_fuel_stops_as_points(client, 
     assert [s["properties"]["station_id"] for s in stops] == [
         stop["station_id"] for stop in body["fuel_stops"]
     ]
+
+
+def test_the_route_lines_are_simplified_so_the_response_stays_small(client, stations, osrm):
+    response = plan(client)
+
+    # OSRM drew the two Routes with 22,416 and 21,139 points (about 1 MB of JSON)
+    assert len(response.content) < 300_000
+    chosen, alternative = features_of(response.json()["map"]["geojson"], "route")
+    assert 500 < len(chosen["geometry"]["coordinates"]) < 22_416 / 5
+    assert 500 < len(alternative["geometry"]["coordinates"]) < 21_139 / 5

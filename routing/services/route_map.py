@@ -6,11 +6,17 @@ Features, each with a `kind` property:
 - "fuel_stop": a Point per Fuel stop, `number`ed from 1 in driving order.
 """
 
+import numpy as np
+
 from routing.services.locations import ResolvedLocation
 from routing.services.osrm import RoutedPath
 from routing.services.planner import PlannedStop, RoutePlan, TripPlan
 
 COORDINATE_DECIMALS = 5  # about 1 metre: plenty for drawing a line
+# A drawn Route line may stray this far from OSRM's road geometry. Fuel planning always uses
+# the full geometry; only the map is simplified, so the response stays small.
+DISPLAY_TOLERANCE_MILES = 0.05  # about 80 metres, under a pixel at zoom 10
+MILES_PER_DEGREE_LATITUDE = 69.09
 
 
 def trip_geojson(trip: TripPlan) -> dict:
@@ -44,7 +50,7 @@ def _route_line(
 ) -> dict:
     coordinates = [
         [round(lon, COORDINATE_DECIMALS), round(lat, COORDINATE_DECIMALS)]
-        for lat, lon in route.points
+        for lat, lon in simplify(route.points, DISPLAY_TOLERANCE_MILES)
     ]
     return _feature(
         {"type": "LineString", "coordinates": coordinates},
@@ -84,3 +90,46 @@ def _fuel_stop_point(number: int, stop: PlannedStop) -> dict:
             "cost": float(stop.cost),
         },
     )
+
+
+def simplify(
+    points: list[tuple[float, float]], tolerance_miles: float
+) -> list[tuple[float, float]]:
+    """Douglas-Peucker: drop the points that lie within `tolerance_miles` of the line kept.
+
+    Start with the two ends; while some point between two kept points is farther than the
+    tolerance from the straight line joining them, keep the farthest one and split there.
+    Distances use a flat projection (miles east and north), which is fine at this scale.
+    """
+    if len(points) < 3:
+        return list(points)
+    lat_lon = np.asarray(points, dtype=float)
+    mean_lat = np.radians(lat_lon[:, 0].mean())
+    xy = (
+        np.column_stack((lat_lon[:, 1] * np.cos(mean_lat), lat_lon[:, 0]))
+        * MILES_PER_DEGREE_LATITUDE
+    )
+    keep = np.zeros(len(points), dtype=bool)
+    keep[[0, -1]] = True
+    pending = [(0, len(points) - 1)]
+    while pending:
+        first, last = pending.pop()
+        if last - first < 2:
+            continue
+        distances = _distances_to_segment(xy[first + 1 : last], xy[first], xy[last])
+        farthest = int(distances.argmax())
+        if distances[farthest] > tolerance_miles:
+            middle = first + 1 + farthest
+            keep[middle] = True
+            pending += [(first, middle), (middle, last)]
+    return [points[i] for i in np.flatnonzero(keep)]
+
+
+def _distances_to_segment(xy: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Distance from each point to the segment a-b."""
+    ab = b - a
+    length_squared = float(ab @ ab)
+    if length_squared == 0:
+        return np.linalg.norm(xy - a, axis=1)
+    t = np.clip((xy - a) @ ab / length_squared, 0, 1)
+    return np.linalg.norm(xy - (a + t[:, None] * ab), axis=1)
