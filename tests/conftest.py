@@ -32,6 +32,35 @@ def _fresh_station_index():
     reset_station_index()
 
 
+class FakeClock:
+    """A monotonic clock that only moves when told to (or when something sleeps)."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+        self.sleeps: list[float] = []
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.now += seconds
+
+
+@pytest.fixture(autouse=True)
+def nominatim_clock(monkeypatch):
+    """Nominatim's 1-request-per-second pacing runs on a fake clock, so tests never wait.
+
+    Each test starts as if Nominatim had never been called; `nominatim_clock.sleeps`
+    records every pause.
+    """
+    clock = FakeClock()
+    monkeypatch.setattr("routing.services.nominatim.monotonic", clock.monotonic)
+    monkeypatch.setattr("routing.services.nominatim.sleep", clock.sleep)
+    monkeypatch.setattr("routing.services.nominatim._last_call", None)
+    return clock
+
+
 @pytest.fixture(autouse=True)
 def _empty_cache():
     """Each test starts with an empty cache, so cached geocodes never leak between tests."""

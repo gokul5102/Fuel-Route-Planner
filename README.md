@@ -293,8 +293,9 @@ you have one.
   the server (the default in-memory cache) or clear the cache.
 - **The default cache is per process.** Set `CACHE_URL` (e.g. `redis://…`) to share it
   between workers.
-- **No Nominatim rate limiter.** Nominatim calls aren't rate-limited across requests. A
-  request makes at most 2 of them (start and finish), and the results are cached, which is
+- **Nominatim pacing is per process.** Nominatim calls are spaced at least 1 s apart within
+  one server process (a request with two free-text places waits about 1 s for the second).
+  Several worker processes would each keep their own pace. Results are cached, which is
   fine for a demo but not for heavy traffic.
 - **Unreachable places.** Hawaii and other places with no road to the start can't be
   planned (`NO_ROUTE`).

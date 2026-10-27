@@ -177,6 +177,20 @@ def test_a_nominatim_timeout_is_a_provider_timeout(http):
     assert error.value.code == "ROUTING_PROVIDER_TIMEOUT"
 
 
+def test_nominatim_calls_are_spaced_at_least_one_second_apart(http, nominatim_clock):
+    """Nominatim's policy is 1 request/s; a start and finish both in free text must wait."""
+    http.get(NOMINATIM, json=WILLIS_TOWER)
+
+    resolve_location(WACKER)
+    nominatim_clock.now += 0.25
+    resolve_location("Willis Tower")  # a different query, so not from the cache
+    nominatim_clock.now += 5
+    resolve_location("Sears Tower")
+
+    assert nominatim_clock.sleeps == [0.75]  # only the second call waited
+    assert len(http.calls) == 3
+
+
 def test_a_census_place_outside_the_usa_outline_is_rejected_without_any_http_call(http):
     """The Census list includes Puerto Rico, but the outline (like "18.46,-66.10") excludes it."""
     with pytest.raises(LocationOutsideUSA):

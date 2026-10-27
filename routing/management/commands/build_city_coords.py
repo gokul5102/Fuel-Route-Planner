@@ -3,13 +3,12 @@
 1. Download the Census Gazetteer (places + county subdivisions) unless already cached.
 2. Write the trimmed US places file used for "City, ST" lookups.
 3. Match every unique city/state in the price file locally; send the rest (hard US
-   names and the Canadian provinces) to Nominatim, one request per second.
+   names and the Canadian provinces) to Nominatim (it paces itself to 1 request per second).
 4. Write one row per city to the city coordinates file as each result arrives.
 """
 
 import csv
 import io
-import time
 import zipfile
 from collections import Counter
 from collections.abc import Iterator
@@ -28,7 +27,6 @@ COUSUBS_ZIP = "2024_Gaz_cousubs_national.zip"
 
 CITY_COORDS_COLUMNS = ["city", "state", "lat", "lon", "source"]
 CANADIAN_PROVINCES = {"AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"}
-NOMINATIM_INTERVAL_SECONDS = 1.0  # Nominatim usage policy: at most 1 request per second
 
 
 def download_once(url: str, path: Path) -> None:
@@ -118,9 +116,7 @@ class Command(BaseCommand):
         coords = index.find(city, state)
         if coords:
             return *coords, "census"
-        if self.nominatim_calls:
-            time.sleep(NOMINATIM_INTERVAL_SECONDS)
-        self.nominatim_calls += 1
+        self.nominatim_calls += 1  # nominatim.search waits so calls are 1 s apart
         country = "ca" if state in CANADIAN_PROVINCES else "us"
         place = nominatim.search(f"{city}, {state}", country_code=country)
         # Free-text search can land in another state (e.g. "La Place, LA" in Alabama).

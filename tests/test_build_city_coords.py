@@ -147,14 +147,6 @@ def test_uses_the_cached_gazetteer_without_downloading(data_dir, settings):
 NOMINATIM_SEARCH = "https://nominatim.openstreetmap.org/search"
 
 
-@pytest.fixture(autouse=True)
-def sleeps(monkeypatch):
-    """Record the throttle's sleeps instead of waiting."""
-    calls = []
-    monkeypatch.setattr("time.sleep", calls.append)
-    return calls
-
-
 def found(lat: float, lon: float, region: str) -> dict:
     """One Nominatim search result; `region` is its ISO 3166-2 code, e.g. "US-TX"."""
     return {"lat": str(lat), "lon": str(lon), "address": {"ISO3166-2-lvl4": region}}
@@ -181,7 +173,7 @@ def nominatim_answers(query: str, country: str, body: list) -> None:
 
 @responses.activate
 def test_cities_census_cannot_match_fall_back_to_nominatim_one_per_second(
-    data_dir, settings, sleeps
+    data_dir, settings, nominatim_clock
 ):
     settings.NOMINATIM_USER_AGENT = "test-agent/1.0"
     write_prices(settings, ("Smithtown", "NY"), ("Tiny Spot", "TX"), ("Toronto", "ON"))
@@ -198,7 +190,7 @@ def test_cities_census_cannot_match_fall_back_to_nominatim_one_per_second(
         ("Toronto", "43.65", "-79.38", "nominatim"),
     ]
     assert len(responses.calls) == 2
-    assert sleeps == [1.0]  # a pause before every Nominatim call after the first
+    assert nominatim_clock.sleeps == [1.0]  # a pause before every Nominatim call after the first
     assert "nominatim: 2" in out.getvalue()
     assert "50.0% of US cities" in out.getvalue()
 
