@@ -64,6 +64,41 @@ def test_stations_in_the_start_zone_are_at_mile_marker_zero():
     assert mile_markers(index) == {1: 0, 2: 0, 3: pytest.approx(9, abs=0.01)}
 
 
+def start_markers(index: StationIndex) -> dict[int, float]:
+    """Mile markers when the nearest Station within 50 miles may stand in for the Start zone."""
+    matches = stations_in_corridor(STRAIGHT_ROUTE, index, corridor_miles=8, start_station_miles=50)
+    return {match.station.opis_id: match.mile_marker for match in matches}
+
+
+def test_with_no_station_in_the_start_zone_the_nearest_within_50_miles_is_at_mile_marker_zero():
+    # 20 and 45 miles behind the start, off the Route; one more on the Route at mile 60
+    index = StationIndex.build(
+        [along_and_off(1, -20, 0), along_and_off(2, -45, 0), along_and_off(3, 60, 1)]
+    )
+
+    assert start_markers(index) == {1: 0, 3: pytest.approx(60, abs=0.01)}
+
+
+def test_a_station_in_the_start_zone_is_used_before_any_off_route_one():
+    index = StationIndex.build([along_and_off(1, 5, 1), along_and_off(2, -20, 0)])
+
+    assert start_markers(index) == {1: 0}
+
+
+def test_the_nearest_station_further_along_the_route_moves_to_mile_marker_zero():
+    index = StationIndex.build([along_and_off(1, 20, 0)])
+
+    matches = stations_in_corridor(STRAIGHT_ROUTE, index, corridor_miles=8, start_station_miles=50)
+
+    assert [(m.station.opis_id, m.mile_marker) for m in matches] == [(1, 0.0)]
+
+
+def test_a_station_more_than_50_miles_from_the_start_is_not_used_to_start():
+    index = StationIndex.build([along_and_off(1, -60, 0), along_and_off(2, 60, 0)])
+
+    assert start_markers(index) == {2: pytest.approx(60, abs=0.01)}
+
+
 def test_a_station_near_the_finish_gets_the_last_mile_marker():
     index = StationIndex.build([along_and_off(1, 100, 2), along_and_off(2, 104, 0)])
 

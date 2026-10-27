@@ -89,7 +89,7 @@ GeoJSON features are left out here:
   "alternatives": [],
   "assumptions": {"range_miles": 500.0, "mpg": 10.0, "tank_gallons": 50.0,
                   "starting_fuel": "empty", "reserve_miles": 0.0, "corridor_miles": 8.0,
-                  "start_zone_miles": 8.0,
+                  "start_zone_miles": 8.0, "start_station_miles": 50.0,
                   "station_locations": "city-level; the detour to reach a Station is ignored"},
   "map": {
     "geojson": {"type": "FeatureCollection", "features": ["route line, start, finish, 2 numbered stops"]},
@@ -121,7 +121,7 @@ Every error has the same shape: `{"error": {"code", "message", "details"}}`.
 | 422 | `LOCATION_NOT_FOUND` | the place can't be found |
 | 422 | `LOCATION_OUTSIDE_USA` | the place is outside the USA's 50 states (e.g. `Toronto, ON`, or `San Juan, PR`) |
 | 422 | `NO_ROUTE` | OSRM has no drivable Route between the points |
-| 422 | `NO_STATION_AT_START` | no Station in the Start zone, so an empty tank can't leave |
+| 422 | `NO_STATION_AT_START` | no Station in the Start zone or within 50 miles of the start, so an empty tank can't leave |
 | 422 | `UNREACHABLE` | a gap longer than the Range; `details.mile_marker` says where the tank runs dry |
 | 502 | `ROUTING_PROVIDER_ERROR` | OSRM or Nominatim failed or was unreachable |
 | 504 | `ROUTING_PROVIDER_TIMEOUT` | OSRM or Nominatim was too slow |
@@ -149,7 +149,8 @@ At startup, every Station is loaded from SQLite into an in-memory KD-tree
 4. **Corridor** (`routing/services/corridor.py`). Each Route is resampled to one point per
    mile. One KD-tree query finds every Station within 8 miles of the Route. A Station's
    Mile marker is the mileage of its nearest sample point, and Stations in the Start zone
-   count as Mile marker 0.
+   count as Mile marker 0. If the Start zone has none, the Station nearest the start (up
+   to 50 miles away) is put at Mile marker 0, so the trip fills up there first.
 5. **Optimize and choose** (`routing/services/optimizer.py`, `planner.py`). The greedy
    optimizer plans each Route, and the Route with the cheapest fuel wins. A tie within
    $0.01 goes to the faster Route. `serializers.py` and `route_map.py` build the JSON and
@@ -161,9 +162,13 @@ in one place.
 
 ## Assumptions
 
-- **Empty tank at the start.** So the first Fuel stop must be in the Start zone (the first
-  8 miles), and the total gallons bought equal distance / MPG. No fuel is left over at the
-  finish, and the Reserve is 0.
+- **Empty tank at the start.** So the first Fuel stop is at Mile marker 0: the cheapest
+  Station in the Start zone (the first 8 miles), or, when the Start zone has none, the
+  Station nearest the start if it is within 50 miles (`START_STATION_MILES`). That covers
+  small towns: 58% of the 31,825 places the autocomplete offers have no Station within 8
+  miles, and all but about 2,500 (mostly in Alaska and Hawaii) have one within 50. The
+  drive to that Station is ignored, like every detour. The total gallons bought equal
+  distance / MPG; no fuel is left over at the finish, and the Reserve is 0.
 - **8-mile Corridor.** A Station counts as on the Route if it is within 8 miles of it. I
   checked this on 5 real Routes with 160 Stations at interstate exits on the Route. An
   8-mile Corridor catches 86% of them, against 68% at 3 miles and 82% at 5 miles. Going to

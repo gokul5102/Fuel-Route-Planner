@@ -26,6 +26,7 @@ class Vehicle:
     mpg: float
     reserve_miles: float
     corridor_miles: float
+    start_station_miles: float
 
     @classmethod
     def from_settings(cls) -> "Vehicle":
@@ -34,6 +35,7 @@ class Vehicle:
             mpg=settings.MPG,
             reserve_miles=settings.MIN_RESERVE_MILES,
             corridor_miles=settings.CORRIDOR_MILES,
+            start_station_miles=settings.START_STATION_MILES,
         )
 
     @property
@@ -131,6 +133,7 @@ def plan_route(route: RoutedPath, index: StationIndex, vehicle: Vehicle) -> Rout
             index,
             corridor_miles=vehicle.corridor_miles,
             route_miles=route.distance_miles,
+            start_station_miles=vehicle.start_station_miles,
         )
     by_id = {match.station.opis_id: match.station for match in on_route}
     with stage("optimize"):

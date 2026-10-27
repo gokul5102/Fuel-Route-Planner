@@ -57,7 +57,7 @@ class NoStationAtStart(FuelPlanError):
     code = "NO_STATION_AT_START"
 
     def __init__(self) -> None:
-        super().__init__("No Station in the Start zone, so an empty tank cannot leave.")
+        super().__init__("No Station near the start, so an empty tank cannot leave.")
 
 
 class Unreachable(FuelPlanError):

@@ -117,6 +117,13 @@
   const features = plan.map.geojson.features;
   const ofKind = (kind) => features.filter((f) => f.properties.kind === kind);
   const TOP_UP_GALLONS = 2.5;  // smaller purchases only bridge to a cheaper Station just ahead
+  // Straight-line miles between two points, to tell when the first stop is away from the Route.
+  function milesBetween(a, b) {
+    const rad = Math.PI / 180;
+    const h = Math.sin((b.lat - a.lat) * rad / 2) ** 2 +
+              Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin((b.lon - a.lon) * rad / 2) ** 2;
+    return 2 * 3958.8 * Math.asin(Math.sqrt(h));
+  }
 
   const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
   const oneDecimal = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
@@ -159,7 +166,8 @@
   ].map((fact) => element("span", "", fact)));
   const a = plan.assumptions;
   document.getElementById("assumptions").append(...[
-    a.range_miles + "-mile Range at " + a.mpg + " MPG, starting with an empty tank.",
+    a.range_miles + "-mile Range at " + a.mpg + " MPG, starting with an empty tank: the first stop is in the first " +
+      a.start_zone_miles + " miles, or the Station nearest the start (up to " + a.start_station_miles + " miles away).",
     "Stations within " + a.corridor_miles + " miles of the Route count as on it; Station locations are city-level.",
     "Each stop buys just enough to reach a cheaper Station, or fills up when none is in Range — so some stops are small top-ups.",
     "Planned on " + (plan.alternatives.length + 1) + " Route(s) from one OSRM call; the cheapest is shown.",
@@ -251,13 +259,19 @@
     }).bindPopup(popupContent(stop)).addTo(map);
     marker.on("click", () => activate(stop.number));
 
+    // With no Station in the Start zone, the first stop is the nearest Station to the start, off the Route.
+    const awayFromStart = stop.number === 1 ? milesBetween(plan.start, stop) : 0;
+    const offRoute = awayFromStart > a.start_zone_miles;
     const name = element("div", "name", titleCase(stop.name));
     name.title = stop.name;
-    if (stop.gallons < TOP_UP_GALLONS) name.append(element("span", "tag", "top-up"));
+    if (offRoute) name.append(element("span", "tag", "fill up first"));
+    else if (stop.gallons < TOP_UP_GALLONS) name.append(element("span", "tag", "top-up"));
     const where = element("div");
     where.style.minWidth = "0";
+    const position = offRoute ? wholeMiles.format(awayFromStart) + " mi from the start"
+                              : "Mile " + wholeMiles.format(stop.mile_marker);
     where.append(name, element("div", "detail num",
-      "Mile " + wholeMiles.format(stop.mile_marker) + " · " + stop.city + ", " + stop.state + " · " + pricePerGallon(stop.price_per_gallon)));
+      position + " · " + stop.city + ", " + stop.state + " · " + pricePerGallon(stop.price_per_gallon)));
     const cost = element("div");
     cost.append(element("div", "cost num", usd.format(stop.cost)), element("div", "gal num", gallons(stop.gallons)));
 

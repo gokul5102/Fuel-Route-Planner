@@ -126,6 +126,9 @@ HTTP_TIMEOUT_SECONDS = env.float("HTTP_TIMEOUT_SECONDS", default=10)
 # --- Vehicle and Corridor -------------------------------------------------------
 
 CORRIDOR_MILES = env.float("CORRIDOR_MILES", default=8)
+# With no Station in the Start zone, the nearest Station within this distance of the start
+# is the first Fuel stop (the tank starts empty). 0 turns this off.
+START_STATION_MILES = env.float("START_STATION_MILES", default=50)
 RANGE_MILES = env.float("RANGE_MILES", default=500)
 MPG = env.float("MPG", default=10)
 MIN_RESERVE_MILES = env.float("MIN_RESERVE_MILES", default=0)

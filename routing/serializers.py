@@ -125,5 +125,6 @@ def _assumptions(vehicle: Vehicle) -> dict:
         "reserve_miles": vehicle.reserve_miles,
         "corridor_miles": vehicle.corridor_miles,
         "start_zone_miles": vehicle.corridor_miles,
+        "start_station_miles": vehicle.start_station_miles,
         "station_locations": "city-level; the detour to reach a Station is ignored",
     }

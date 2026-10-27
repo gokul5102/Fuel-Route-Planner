@@ -92,9 +92,9 @@ def test_post_is_not_allowed(client):
 
 
 @pytest.mark.django_db
-def test_no_station_in_the_start_zone_is_no_station_at_start(client, osrm):
+def test_no_station_within_50_miles_of_the_start_is_no_station_at_start(client, osrm):
     osrm.get(OSRM_URL, json=json.loads(OSRM_FIXTURE.read_text()))
-    add_station(1, "Iowa City", 41.655661, -91.530859)  # Mile marker 220
+    add_station(1, "Iowa City", 41.655661, -91.530859)  # Mile marker 220, ~200 miles away
 
     error_of(plan(client), 422, "NO_STATION_AT_START")
 

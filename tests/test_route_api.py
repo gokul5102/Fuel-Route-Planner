@@ -135,6 +135,31 @@ def test_each_fuel_stop_carries_the_station_details(client, stations, osrm):
     }
 
 
+def test_with_no_station_in_the_start_zone_the_trip_fills_up_at_the_nearest_one(
+    client, stations, osrm
+):
+    # Take away the Chicago Stations; Waukegan is about 35 miles north, off the Route.
+    Station.objects.filter(opis_id__in=[101, 102]).delete()
+    Station.objects.create(
+        opis_id=901,
+        name="WAUKEGAN STOP",
+        address="I-94, EXIT 1",
+        city="Waukegan",
+        state="IL",
+        lat=42.363633,
+        lon=-87.844794,
+        price_per_gallon=Decimal("3.899"),
+        geocode_source="census",
+    )
+
+    response = plan(client)
+
+    assert response.status_code == 200
+    first = response.json()["fuel_stops"][0]
+    # the same price as Cheap Chicago, so the same purchase: just enough to reach Iowa City
+    assert (first["station_id"], first["mile_marker"], first["gallons"]) == (901, 0.0, 22.03)
+
+
 def test_states_the_assumptions_behind_the_plan(client, stations, osrm):
     assert plan(client).json()["assumptions"] == {
         "range_miles": 500.0,
@@ -144,6 +169,7 @@ def test_states_the_assumptions_behind_the_plan(client, stations, osrm):
         "reserve_miles": 0.0,
         "corridor_miles": 8.0,
         "start_zone_miles": 8.0,
+        "start_station_miles": 50.0,
         "station_locations": "city-level; the detour to reach a Station is ignored",
     }
 
