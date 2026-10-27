@@ -12,6 +12,7 @@ from time import monotonic, sleep
 import requests
 from django.conf import settings
 
+from routing.services import http
 from routing.services.request_metrics import count_external_call
 
 
@@ -50,7 +51,7 @@ def search(query: str, country_code: str = "us") -> NominatimPlace | None:
     _wait_for_turn()
     count_external_call()
     try:
-        response = requests.get(
+        status, results = http.get_json(  # within HTTP_TIMEOUT_SECONDS in total
             f"{settings.NOMINATIM_BASE_URL}/search",
             params={
                 "q": query,
@@ -60,12 +61,18 @@ def search(query: str, country_code: str = "us") -> NominatimPlace | None:
                 "addressdetails": 1,
             },
             headers={"User-Agent": settings.NOMINATIM_USER_AGENT},
-            timeout=settings.HTTP_TIMEOUT_SECONDS,
         )
-        response.raise_for_status()
-        results = response.json()
-    except (requests.RequestException, ValueError) as exc:
+    except (requests.RequestException, ValueError) as exc:  # unreachable, too slow, not JSON
         raise NominatimError(str(exc)) from exc
+    if status >= 400:
+        raise NominatimError(f"Nominatim answered HTTP {status}.")
+    try:
+        return _best_place(results)
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:  # not the shape we expect
+        raise NominatimError(f"Nominatim sent an answer we could not read: {exc!r}") from exc
+
+
+def _best_place(results: list) -> NominatimPlace | None:
     if not results:
         return None
     best = results[0]

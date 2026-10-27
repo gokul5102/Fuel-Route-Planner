@@ -4,6 +4,9 @@ Order: "lat,lng" (parsed) -> "City, ST" (local Census lookup) -> free text (Nomi
 Nominatim is mocked at the HTTP layer; any unmocked request fails the test.
 """
 
+import io
+import time
+
 import pytest
 import requests
 import responses
@@ -14,6 +17,7 @@ from routing.services.locations import (
     LocationOutsideUSA,
     resolve_location,
 )
+from tests.test_route_errors import SlowBody
 
 NOMINATIM = "https://nominatim.test/search"
 WACKER = "233 S Wacker Dr, Chicago, IL"
@@ -175,6 +179,28 @@ def test_a_nominatim_timeout_is_a_provider_timeout(http):
         resolve_location(WACKER)
 
     assert error.value.code == "ROUTING_PROVIDER_TIMEOUT"
+
+
+def test_nominatim_is_given_up_on_once_the_total_limit_passes(http, settings):
+    settings.HTTP_TIMEOUT_SECONDS = 0.2
+    http.get(NOMINATIM, body=io.BufferedReader(SlowBody(seconds=2)))
+
+    started = time.monotonic()
+    with pytest.raises(GeocodingFailed) as error:
+        resolve_location(WACKER)
+
+    assert time.monotonic() - started < 1  # not the 2 s the read takes
+    assert error.value.code == "ROUTING_PROVIDER_TIMEOUT"
+
+
+@pytest.mark.parametrize("body", [{"lat": "41.9"}, [{"lat": "41.9"}], ["not a place"]])
+def test_a_nominatim_answer_we_cannot_read_is_a_provider_error(http, body):
+    http.get(NOMINATIM, json=body)
+
+    with pytest.raises(GeocodingFailed) as error:
+        resolve_location(WACKER)
+
+    assert error.value.code == "ROUTING_PROVIDER_ERROR"
 
 
 def test_nominatim_calls_are_spaced_at_least_one_second_apart(http, nominatim_clock):

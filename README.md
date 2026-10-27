@@ -251,9 +251,11 @@ Other measurements:
 | OpenStreetMap tiles and Leaflet (unpkg) | the map page, loaded by the browser | no API key |
 | US Census Gazetteer 2024 | Station and city coordinates, offline only | public domain |
 
-**Timeouts.** Every external call has a 10-second timeout and no retries, so one request
-never makes more than one routing call. OSRM's whole download is also capped at 10 s. A
-read that stalls just before that limit can stretch a request to about 20 s.
+**Timeouts.** Every OSRM and Nominatim call gets 10 seconds in total, from connecting to
+the last byte, and no retries, so one request never makes more than one routing call.
+`requests` only times the connect and each read separately, so `routing/services/http.py`
+downloads in a worker thread and stops waiting for it once the 10 s are up; the worker
+then stops reading too.
 
 **The OSRM demo server is best-effort.** It sometimes overloads. During development it
 returned a 504 after 21 s and a 502 after 13 s, while a small request still answered in
