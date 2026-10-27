@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Django
+db.sqlite3
+staticfiles/
+
+# Environment
+.env
+
+# Raw downloads used only by build_city_coords
+data/.cache/
+
+# Local working artifacts — never committed (CLAUDE.md, glossary, specs, agentic plans, tickets)
+CLAUDE.md
+GLOSSARY.md
+docs/SPEC.md
+docs/tickets/
+.scratch/
+plans/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
