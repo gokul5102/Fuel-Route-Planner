@@ -1,4 +1,4 @@
-"""Plan a trip: resolve -> route -> corridor -> optimize.
+"""Plan a trip: resolve -> route -> corridor -> optimize -> choose the cheapest Route.
 
 `plan_trip` is the whole request flow; each step is a small service of its own.
 """
@@ -72,8 +72,16 @@ def plan_trip(start_query: str, finish_query: str) -> TripPlan:
     finish = resolve_location(finish_query)
     check_distinct(start, finish)
     routes = fetch_routes((start.lat, start.lon), (finish.lat, finish.lon))
-    plan = plan_route(routes[0], get_station_index(), vehicle)
+    plan = choose_cheapest_route(routes, get_station_index(), vehicle)
     return TripPlan(start, finish, plan, vehicle)
+
+
+def choose_cheapest_route(
+    routes: list[RoutedPath], index: StationIndex, vehicle: Vehicle
+) -> RoutePlan:
+    """Plan every Route OSRM offered; the one with the cheapest fuel wins."""
+    plans = [plan_route(route, index, vehicle) for route in routes]
+    return min(plans, key=lambda plan: plan.total_cost)
 
 
 def plan_route(route: RoutedPath, index: StationIndex, vehicle: Vehicle) -> RoutePlan:
