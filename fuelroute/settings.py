@@ -108,6 +108,10 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Plans the cheapest fuel stops for a road trip between two places in the USA.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",  # the default
+        "routing.api_docs.add_map_page",  # the map page is a plain Django view
+    ],
 }
 
 # --- External services --------------------------------------------------------

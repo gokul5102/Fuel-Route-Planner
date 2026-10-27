@@ -245,6 +245,12 @@ def _response_examples(named_bodies: dict[str, dict]) -> list[OpenApiExample]:
     ]
 
 
+ROUTE_SUMMARY = "Plan the cheapest Fuel stops between two places in the USA"
+ROUTE_DESCRIPTION = (
+    "One routing call (OSRM, up to 3 Routes) per uncached trip; repeats come from the cache "
+    "with no external calls. Pick a named example in both `start` and `finish`."
+)
+
 ROUTE_RESPONSES = {
     200: OpenApiResponse(
         OpenApiTypes.OBJECT,
@@ -261,3 +267,32 @@ ROUTE_RESPONSES = {
         for status, bodies in ERROR_EXAMPLES.items()
     },
 }
+
+
+def add_map_page(result: dict, generator, request, public) -> dict:
+    """drf-spectacular postprocessing hook: document GET /api/route/map/ too.
+
+    drf-spectacular only sees DRF views, and the map page is a plain Django view. It takes
+    the same query as GET /api/route/, so its parameters are copied from there.
+    """
+    route = result["paths"]["/api/route/"]["get"]
+    html = {"text/html": {"schema": {"type": "string"}}}
+    error_page = "An HTML page with the same error code and status as the API."
+    result["paths"]["/api/route/map/"] = {
+        "get": {
+            "operationId": "route_map",
+            "summary": "The same plan drawn on an interactive Leaflet map",
+            "description": "Open it in a browser. It reuses the cached plan, so opening it "
+            "after calling GET /api/route/ makes no external calls.",
+            "tags": route.get("tags", []),
+            "parameters": route["parameters"],
+            "responses": {
+                "200": {"description": "The map page.", "content": html},
+                **{
+                    str(status): {"description": error_page, "content": html}
+                    for status in ERROR_EXAMPLES
+                },
+            },
+        }
+    }
+    return result

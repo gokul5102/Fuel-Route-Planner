@@ -55,6 +55,17 @@ def test_route_query_parameters_have_the_named_examples(client):
     assert start["Outside the USA"] == "Toronto, ON"
 
 
+def test_map_page_is_documented_with_the_same_named_examples(client):
+    operation = _operation(client, "/api/route/map/")
+
+    start = _parameter_examples(operation, "start")
+    finish = _parameter_examples(operation, "finish")
+
+    assert set(start) == set(finish) == NAMED_EXAMPLES
+    assert (start["Cross-country"], finish["Cross-country"]) == ("Chicago, IL", "Los Angeles, CA")
+    assert "text/html" in operation["responses"]["200"]["content"]
+
+
 def _response_examples(operation: dict, status: str) -> list[dict]:
     content = operation["responses"][status]["content"]["application/json"]
     return [example["value"] for example in content["examples"].values()]
