@@ -25,6 +25,9 @@ docs/tickets/
 .scratch/
 plans/
 
+# Claude Code local state (agent worktrees)
+.claude/
+
 # OS / editors
 .DS_Store
 .idea/
