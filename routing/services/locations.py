@@ -13,9 +13,11 @@ from dataclasses import dataclass
 
 from django.conf import settings
 from django.core.cache import cache
+from requests import Timeout
 
 from routing.services import nominatim
 from routing.services.places import get_place_index
+from routing.services.usa import is_in_usa
 
 COORDINATES = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$")
 CITY_STATE = re.compile(r"^\s*([^,]+?)\s*,\s*([A-Za-z]{2})\s*$")
@@ -65,11 +67,22 @@ class LocationOutsideUSA(LocationError):
         super().__init__(f"{query!r} is outside the USA; only US trips can be planned.", query)
 
 
+class GeocodingFailed(LocationError):
+    """Nominatim could not be reached or answered with an error (an upstream failure)."""
+
+    def __init__(self, query: str, timed_out: bool) -> None:
+        self.code = "ROUTING_PROVIDER_TIMEOUT" if timed_out else "ROUTING_PROVIDER_ERROR"
+        self.status_code = 504 if timed_out else 502
+        super().__init__(f"The geocoding service failed for {query!r}; try again later.", query)
+
+
 def resolve_location(query: str) -> ResolvedLocation:
     match = COORDINATES.match(query)
     if match:
         lat, lon = float(match[1]), float(match[2])
         if -90 <= lat <= 90 and -180 <= lon <= 180:
+            if not is_in_usa(lat, lon):
+                raise LocationOutsideUSA(query)
             return ResolvedLocation(query, lat, lon, "coordinates")
     state = None
     match = CITY_STATE.match(query)
@@ -94,7 +107,10 @@ def _geocode(query: str, state: str | None) -> tuple[float, float]:
     cached = cache.get(key)
     if cached is not None:
         return cached
-    place = nominatim.search(query, country_code="us")
+    try:
+        place = nominatim.search(query, country_code="us")
+    except nominatim.NominatimError as error:
+        raise GeocodingFailed(query, timed_out=isinstance(error.__cause__, Timeout)) from error
     if place is None or (state and place.region != f"US-{state}"):
         raise LocationNotFound(query)
     cache.set(key, (place.lat, place.lon), settings.GEOCODE_CACHE_SECONDS)

@@ -5,9 +5,15 @@ Nominatim is mocked at the HTTP layer; any unmocked request fails the test.
 """
 
 import pytest
+import requests
 import responses
 
-from routing.services.locations import LocationNotFound, LocationOutsideUSA, resolve_location
+from routing.services.locations import (
+    GeocodingFailed,
+    LocationNotFound,
+    LocationOutsideUSA,
+    resolve_location,
+)
 
 NOMINATIM = "https://nominatim.test/search"
 WACKER = "233 S Wacker Dr, Chicago, IL"
@@ -111,3 +117,62 @@ def test_a_nominatim_answer_in_another_state_is_not_a_match(http):
 
     with pytest.raises(LocationNotFound):
         resolve_location("Not A Census Town, KS")
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "43.6532,-79.3832",  # Toronto, across Lake Ontario from New York
+        "45.5017,-73.5673",  # Montreal
+        "49.2827,-123.1207",  # Vancouver
+        "60.7212,-135.0568",  # Whitehorse, Yukon (east of the Alaska panhandle)
+        "19.4326,-99.1332",  # Mexico City
+        "32.5149,-117.0382",  # Tijuana
+        "26.0,-90.0",  # Gulf of Mexico
+        "35.0,-60.0",  # Atlantic Ocean
+        "51.5074,-0.1278",  # London
+    ],
+)
+def test_coordinates_outside_the_usa_are_rejected(http, query):
+    with pytest.raises(LocationOutsideUSA):
+        resolve_location(query)
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "41.8781,-87.6298",  # Chicago
+        "34.0522,-118.2437",  # Los Angeles
+        "40.97,-117.0",  # I-80 in the Nevada desert, far from any town
+        "25.7617,-80.1918",  # Miami
+        "24.5551,-81.78",  # Key West
+        "29.3013,-94.7977",  # Galveston
+        "42.3314,-83.0458",  # Detroit, across the river from Windsor
+        "47.6062,-122.3321",  # Seattle
+        "46.8721,-68.0101",  # Presque Isle, northern Maine
+        "48.9984,-97.0",  # the 49th parallel in North Dakota
+        "61.2181,-149.9003",  # Anchorage
+        "58.3019,-134.4197",  # Juneau, in the Alaska panhandle
+        "21.3069,-157.8583",  # Honolulu
+    ],
+)
+def test_coordinates_inside_the_usa_are_accepted(http, query):
+    assert resolve_location(query).resolved_by == "coordinates"
+
+
+def test_a_nominatim_outage_is_a_provider_error(http):
+    http.get(NOMINATIM, status=503)
+
+    with pytest.raises(GeocodingFailed) as error:
+        resolve_location(WACKER)
+
+    assert (error.value.code, error.value.status_code) == ("ROUTING_PROVIDER_ERROR", 502)
+
+
+def test_a_nominatim_timeout_is_a_provider_timeout(http):
+    http.get(NOMINATIM, body=requests.Timeout("read timed out"))
+
+    with pytest.raises(GeocodingFailed) as error:
+        resolve_location(WACKER)
+
+    assert (error.value.code, error.value.status_code) == ("ROUTING_PROVIDER_TIMEOUT", 504)
