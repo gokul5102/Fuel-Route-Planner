@@ -123,6 +123,31 @@ def test_osrm_finding_no_road_between_the_points_is_no_route(client, osrm, osrm_
     assert error["details"] == {"provider_code": osrm_code}
 
 
+def ok_with(**route) -> dict:
+    """An OSRM "Ok" answer with one Route made of `route`'s fields."""
+    return {"code": "Ok", "routes": [route]}
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        ["not", "an", "object"],
+        {"code": "Ok"},  # no routes
+        ok_with(distance=1000.0, duration=60.0),  # no geometry
+        ok_with(geometry="_p~iF~ps|U", duration=60.0),  # no distance
+        ok_with(geometry="_p~iF~ps|U", distance=None, duration=60.0),
+        ok_with(geometry="_p~iF", distance=1000.0, duration=60.0),  # a lat without its lon
+        ok_with(geometry="_p~iF~ps|U_", distance=1000.0, duration=60.0),  # cut mid-number
+    ],
+)
+def test_osrm_answering_ok_with_a_body_we_cannot_read_is_a_routing_provider_error(
+    client, osrm, body
+):
+    osrm.get(OSRM_URL, json=body)
+
+    error_of(plan(client), 502, "ROUTING_PROVIDER_ERROR")
+
+
 def test_osrm_answering_ok_with_no_routes_is_no_route(client, osrm):
     osrm.get(OSRM_URL, json={"code": "Ok", "routes": [], "waypoints": []})
 

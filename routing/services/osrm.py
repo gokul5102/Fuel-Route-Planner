@@ -92,12 +92,24 @@ def fetch_routes(start: tuple[float, float], finish: tuple[float, float]) -> lis
     except (requests.RequestException, ValueError) as error:  # unreachable, or not JSON
         raise RoutingError("The routing provider could not be reached or broke.") from error
 
+    try:
+        return _read_routes(body, response.status_code)
+    except (AttributeError, KeyError, TypeError, ValueError) as error:  # not the shape we expect
+        raise RoutingError("The routing provider sent an answer we could not read.") from error
+
+
+def _read_routes(body: dict, http_status: int) -> list[RoutedPath]:
+    """OSRM's JSON answer as Routes, or the matching RoutingError.
+
+    A body that isn't shaped like OSRM's answer raises AttributeError, KeyError,
+    TypeError or ValueError, which fetch_routes reports as ROUTING_PROVIDER_ERROR.
+    """
     osrm_code = body.get("code")
     if osrm_code in NO_ROUTE_CODES:
         raise NoRoute(f"No driving Route between the points: {body.get('message')}", osrm_code)
     if osrm_code != "Ok":
         raise RoutingError(
-            f"The routing provider failed (HTTP {response.status_code}, {osrm_code}).", osrm_code
+            f"The routing provider failed (HTTP {http_status}, {osrm_code}).", osrm_code
         )
     if not body["routes"]:  # "Ok", but nothing to drive
         raise NoRoute("The routing provider found no Route between the points.")
