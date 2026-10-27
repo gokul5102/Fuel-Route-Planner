@@ -7,7 +7,9 @@ status, and DRF calls `api_exception_handler` for anything a view raises.
 
 import logging
 
-from rest_framework import status
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.http import Http404
+from rest_framework import exceptions, status
 from rest_framework.exceptions import APIException, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
@@ -36,6 +38,12 @@ def describe_error(exc: Exception, request=None) -> tuple[int, dict]:
     if isinstance(code, str) and code in STATUS_BY_CODE:  # a domain error from the services
         details = getattr(exc, "details", None)
         return STATUS_BY_CODE[code], error_body(code, str(exc), details)
+
+    # Django's own 404 and 403, turned into DRF's as DRF's handler does
+    if isinstance(exc, Http404):
+        exc = exceptions.NotFound()
+    elif isinstance(exc, DjangoPermissionDenied):
+        exc = exceptions.PermissionDenied()
 
     if isinstance(exc, ValidationError):  # the query parameters failed validation
         return status.HTTP_400_BAD_REQUEST, error_body(

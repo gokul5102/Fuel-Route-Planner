@@ -13,6 +13,8 @@ from pathlib import Path
 import pytest
 import requests
 import responses
+from django.core.exceptions import PermissionDenied
+from django.http import Http404
 
 from routing.models import Station
 
@@ -262,3 +264,25 @@ def test_an_unexpected_failure_still_uses_the_envelope(client, monkeypatch):
     error = error_of(plan(client), 500, "INTERNAL_ERROR")
 
     assert "bug" not in error["message"]  # internals are logged, not shown
+
+
+@pytest.mark.parametrize(
+    ("django_error", "status", "code"),
+    [(Http404, 404, "NOT_FOUND"), (PermissionDenied, 403, "PERMISSION_DENIED")],
+)
+@pytest.mark.parametrize("path", ["/api/route/", "/api/route/map/"])
+def test_django_not_found_and_permission_denied_keep_their_status(
+    client, monkeypatch, django_error, status, code, path
+):
+    def refusing_planner(start, finish):
+        raise django_error
+
+    monkeypatch.setattr("routing.views.plan_trip", refusing_planner)
+
+    response = client.get(path, {"start": CHICAGO, "finish": LOS_ANGELES})
+
+    assert response.status_code == status
+    if path == "/api/route/":
+        error_of(response, status, code)
+    else:
+        assert code in response.content.decode()
