@@ -2,9 +2,10 @@
 
 OSRM is mocked with a real recorded Chicago -> Los Angeles response (2,018.03 miles,
 35.36 hours). That Route runs I-80 -> Denver -> I-70 -> I-15 -> Las Vegas, and the Stations
-below sit in cities on it. Their Mile markers on this Route: Chicago 0, Iowa City 220,
-Des Moines 329, Omaha 471, Ogallala 792, Denver 994, Grand Junction 1242, Richfield 1465,
-Cedar City 1577, Las Vegas 1746. Milwaukee and Fillmore are cheap but off the Route.
+below sit in cities on it. Their Mile markers on this Route (scaled to OSRM's 2,018.03 miles):
+Chicago 0, Iowa City 220.3, Des Moines 329.4, Omaha 471.6, Ogallala 793.1, Denver 995.3,
+Grand Junction 1243.7, Richfield 1467.0, Cedar City 1579.1, Las Vegas 1748.4.
+Milwaukee and Fillmore are cheap but off the Route.
 """
 
 import json
@@ -85,13 +86,13 @@ def test_plans_the_cheapest_fuel_stops_from_chicago_to_los_angeles(client, stati
     assert [
         (s["station_id"], s["mile_marker"], s["gallons"], s["cost"]) for s in body["fuel_stops"]
     ] == [
-        (102, 0.0, 22.0, 85.78),  # cheapest at the start; just enough to reach $3.30 Iowa City
-        (104, 220.0, 50.0, 165.0),  # nothing cheaper in Range: fill up, go to Omaha
-        (106, 471.0, 7.2, 24.84),  # just enough to top up for $3.20 Ogallala
-        (107, 792.0, 50.0, 160.0),  # fill up, go to the cheapest in Range (Grand Junction)
-        (109, 1242.0, 17.3, 63.15),  # just enough to top up for $3.40 Richfield
-        (110, 1465.0, 50.0, 170.0),  # fill up, go to Cedar City
-        (112, 1577.0, 5.303, 18.83),  # Los Angeles is in Range: just enough to arrive
+        (102, 0.0, 22.03, 85.89),  # cheapest at the start; just enough to reach $3.30 Iowa City
+        (104, 220.3, 50.0, 165.0),  # nothing cheaper in Range: fill up, go to Omaha
+        (106, 471.6, 7.277, 25.11),  # just enough to top up for $3.20 Ogallala
+        (107, 793.1, 50.0, 160.0),  # fill up, go to the cheapest in Range (Grand Junction)
+        (109, 1243.7, 17.391, 63.48),  # just enough to top up for $3.40 Richfield
+        (110, 1467.0, 50.0, 170.0),  # fill up, go to Cedar City
+        (112, 1579.1, 5.106, 18.12),  # Los Angeles is in Range: just enough to arrive
     ]
     assert body["total_gallons"] == 201.803  # 2,018.03 miles / 10 MPG
     assert body["total_fuel_cost"] == 687.6
@@ -124,8 +125,8 @@ def test_each_fuel_stop_carries_the_station_details(client, stations, osrm):
         "lon": -87.684939,
         "price_per_gallon": 3.899,
         "mile_marker": 0.0,
-        "gallons": 22.0,
-        "cost": 85.78,
+        "gallons": 22.03,
+        "cost": 85.89,
     }
 
 

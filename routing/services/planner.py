@@ -80,7 +80,12 @@ def plan_route(route: RoutedPath, index: StationIndex, vehicle: Vehicle) -> Rout
 
     Raises the optimizer's FuelPlanError when the Route cannot be fuelled.
     """
-    on_route = stations_in_corridor(route.points, index, corridor_miles=vehicle.corridor_miles)
+    on_route = stations_in_corridor(
+        route.points,
+        index,
+        corridor_miles=vehicle.corridor_miles,
+        route_miles=route.distance_miles,
+    )
     by_id = {match.station.opis_id: match.station for match in on_route}
     fuel_plan = plan_fuel_stops(
         route.distance_miles,

@@ -133,7 +133,7 @@ def chicago_to_los_angeles() -> tuple[float, list[CandidateStation]]:
     route = json.loads(OSRM_FIXTURE.read_text())["routes"][0]
     distance = route["distance"] / METERS_PER_MILE
     points = [(lat, lon) for lon, lat in route["geometry"]["coordinates"]]
-    on_route = stations_in_corridor(points, index, corridor_miles=8)
+    on_route = stations_in_corridor(points, index, corridor_miles=8, route_miles=distance)
     return distance, [
         CandidateStation(m.station.opis_id, m.mile_marker, m.station.price) for m in on_route
     ]
@@ -146,7 +146,7 @@ def test_greedy_plans_the_real_chicago_to_los_angeles_trip_at_the_known_cost(
 
     plan = plan_fuel_stops(distance, stations, range_miles=RANGE_MILES, mpg=MPG)
 
-    assert plan.total_cost == Decimal("612.24")
+    assert plan.total_cost == Decimal("612.22")  # $612.24 before Mile marker scaling
     assert len(plan.stops) == 18
 
 

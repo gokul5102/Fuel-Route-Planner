@@ -3,7 +3,10 @@
 1. Resample the Route to about one point per mile, with each point's cumulative miles.
 2. A Station is on the Route if it is within `corridor_miles` of any sample point.
 3. Its Mile marker is the cumulative miles of its nearest sample point (the detour is
-   ignored). Stations in the Start zone (the first `start_zone_miles`) are at Mile marker 0.
+   ignored), scaled so the finish sits at the Route distance OSRM reported: the line
+   measured from the geometry is slightly shorter than the road, and the totals use
+   OSRM's figure. Stations in the Start zone (the first `start_zone_miles`) are at
+   Mile marker 0.
 """
 
 from dataclasses import dataclass
@@ -40,10 +43,16 @@ def stations_in_corridor(
     *,
     corridor_miles: float,
     start_zone_miles: float | None = None,
+    route_miles: float | None = None,
 ) -> list[CorridorStation]:
-    """The Stations within the Corridor, ordered by Mile marker."""
+    """The Stations within the Corridor, ordered by Mile marker.
+
+    `route_miles` is the Route distance to scale Mile markers to (default: the measured line).
+    """
     start_zone = corridor_miles if start_zone_miles is None else start_zone_miles
     samples, sample_miles = resample(route)
+    if route_miles is not None and sample_miles[-1] > 0:
+        sample_miles = sample_miles * (route_miles / sample_miles[-1])
     sample_points = unit_vectors(samples)
     rows = index.near(sample_points, corridor_miles)
     if not rows:

@@ -70,6 +70,18 @@ def test_a_station_near_the_finish_gets_the_last_mile_marker():
     assert mile_markers(index) == {1: pytest.approx(100, abs=0.01), 2: pytest.approx(100, abs=0.01)}
 
 
+def test_mile_markers_are_scaled_to_the_reported_route_distance():
+    # OSRM says the road is 110 miles; the line drawn from its geometry measures 100.
+    index = StationIndex.build([along_and_off(1, 50, 1), along_and_off(2, 100, 0)])
+
+    matches = stations_in_corridor(STRAIGHT_ROUTE, index, corridor_miles=8, route_miles=110)
+
+    assert {m.station.opis_id: m.mile_marker for m in matches} == {
+        1: pytest.approx(55, abs=0.01),
+        2: pytest.approx(110),  # the last Mile marker is the Route distance
+    }
+
+
 def test_an_empty_index_matches_nothing():
     assert mile_markers(StationIndex.build([])) == {}
 
