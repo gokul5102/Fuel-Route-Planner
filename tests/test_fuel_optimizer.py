@@ -113,3 +113,12 @@ def test_costs_are_rounded_per_stop_and_the_total_is_their_sum():
     assert all(c == c.quantize(Decimal("0.01")) for c in costs)
     assert result.total_cost == sum(costs)
     assert result.total_gallons == pytest.approx(10)
+
+
+def test_price_ties_between_stations_ahead_still_give_the_cheapest_total():
+    result = plan(900, station(1, 0, "3.00"), station(3, 450, "3.00"), station(2, 400, "3.00"))
+
+    # Nothing strictly cheaper ahead: fill up, then drive to the cheapest in Range; the tie
+    # goes to the lower OPIS ID (Station 2 at 400), from where the destination is in Range.
+    assert summary(result) == [(1, 50.0, Decimal("150.00")), (2, 40.0, Decimal("120.00"))]
+    assert result.total_cost == Decimal("270.00")
