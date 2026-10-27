@@ -18,7 +18,9 @@ from routing.services import polyline
 from routing.services.request_metrics import count_external_call
 
 METERS_PER_MILE = 1609.344
-CHUNK_BYTES = 64 * 1024
+# Each read waits for a whole chunk, so the deadline is checked once per chunk. Small chunks
+# keep a trickling body from overrunning it by much (OSRM has sent ~150 KB over 37 s).
+CHUNK_BYTES = 4 * 1024
 
 
 @dataclass(frozen=True)
