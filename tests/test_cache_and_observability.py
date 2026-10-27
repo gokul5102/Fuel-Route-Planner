@@ -18,6 +18,9 @@ from tests.test_route_api import (  # noqa: F401  (stations is a pytest fixture)
 )
 
 NOMINATIM_URL = "https://nominatim.test/search"
+OSRM_CENSUS_URL = "https://osrm.test/route/v1/driving/-87.684939,41.837045;-118.410825,34.019394"
+# The reversed trip gets the same recorded Route: only the cache key matters here.
+OSRM_REVERSED_URL = "https://osrm.test/route/v1/driving/-118.2437,34.0522;-87.6298,41.8781"
 
 
 @pytest.fixture
@@ -86,3 +89,61 @@ def test_a_fresh_plan_reports_a_cache_miss_its_calls_and_each_stage_time(client,
     assert set(timings) == {"geocode", "routing", "corridor", "optimize", "total"}
     assert all(ms >= 0 for ms in timings.values())
     assert timings["total"] >= timings["routing"] + timings["corridor"] + timings["optimize"]
+
+
+@pytest.mark.usefixtures("stations")
+def test_a_repeat_request_is_served_from_the_cache_with_no_external_calls(client, http):
+    first = plan(client)
+    second = plan(client)
+
+    assert len(http.calls) == 1  # OSRM was asked once, for the first request only
+    assert second.status_code == 200
+    assert second.json()["meta"]["cache"] == "hit"
+    assert second.json()["meta"]["external_calls"] == 0
+    assert second.headers["X-External-Calls"] == "0"
+    without_meta = [{k: v for k, v in r.json().items() if k != "meta"} for r in (first, second)]
+    assert without_meta[0] == without_meta[1]
+
+
+@pytest.mark.usefixtures("stations")
+def test_the_cache_ignores_case_and_extra_spaces_in_place_names(client, http):
+    http.get(OSRM_CENSUS_URL, json=json.loads(OSRM_FIXTURE.read_text()))
+
+    plan(client, "Chicago, IL", "Los Angeles, CA")
+    again = plan(client, "  chicago,   IL ", "LOS ANGELES,  ca")
+
+    assert again.json()["meta"]["cache"] == "hit"
+    assert len(http.calls) == 1
+
+
+@pytest.mark.usefixtures("stations")
+def test_a_different_trip_is_not_a_cache_hit(client, http):
+    http.get(OSRM_REVERSED_URL, json=json.loads(OSRM_FIXTURE.read_text()))
+
+    plan(client)
+    reversed_trip = plan(client, start=LOS_ANGELES, finish=CHICAGO)
+
+    assert reversed_trip.json()["meta"]["cache"] == "miss"
+    assert len(http.calls) == 2
+
+
+@pytest.mark.usefixtures("stations")
+def test_the_map_page_after_the_api_makes_no_external_calls(client, http):
+    plan(client)
+
+    page = client.get("/api/route/map/", {"start": CHICAGO, "finish": LOS_ANGELES})
+
+    assert page.status_code == 200
+    assert page.headers["X-External-Calls"] == "0"
+    assert len(http.calls) == 1
+
+
+@pytest.mark.usefixtures("stations")
+def test_errors_are_not_cached(client, http, settings):
+    http.get(NOMINATIM_URL, json=[])
+
+    plan(client, start="Nowhere Special, Atlantis")
+    again = plan(client, start="Nowhere Special, Atlantis")
+
+    assert again.status_code == 422
+    assert again.headers["X-External-Calls"] == "1"

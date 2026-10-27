@@ -1,5 +1,8 @@
+import hashlib
 from urllib.parse import urlencode
 
+from django.conf import settings
+from django.core.cache import cache
 from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_GET
@@ -14,9 +17,29 @@ from routing.services import request_metrics
 from routing.services.planner import plan_trip
 
 
-def plan_trip_body(start: str, finish: str) -> dict:
-    """The JSON body of a plan (without `map.url`). The API and the map page both use this."""
-    return serialize_trip_plan(plan_trip(start, finish))
+def plan_trip_body(start: str, finish: str) -> tuple[dict, str]:
+    """The JSON body of a plan (without `map.url` and `meta`), and "hit" or "miss".
+
+    The API and the map page both use this, so opening the map after calling the API is
+    a cache hit with no external calls. Only successful plans are cached; the cached dict
+    is never changed (callers build new dicts around it).
+    """
+    key = plan_cache_key(start, finish)
+    body = cache.get(key)
+    if body is not None:
+        return body, "hit"
+    body = serialize_trip_plan(plan_trip(start, finish))
+    cache.set(key, body, settings.PLAN_CACHE_SECONDS)
+    return body, "miss"
+
+
+def plan_cache_key(start: str, finish: str) -> str:
+    """Case and runs of spaces don't matter: "Chicago,  IL" and "chicago, il" share a plan.
+
+    The text is hashed so the key is safe for any cache backend (e.g. memcached).
+    """
+    normalised = "|".join(" ".join(text.lower().split()) for text in (start, finish))
+    return "plan:" + hashlib.sha256(normalised.encode()).hexdigest()
 
 
 def map_url(request, start: str, finish: str) -> str:
@@ -48,9 +71,9 @@ class RouteView(APIView):
         query = RouteQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         start, finish = query.validated_data["start"], query.validated_data["finish"]
-        body = plan_trip_body(start, finish)
+        body, cache_status = plan_trip_body(start, finish)
         url = map_url(request, start, finish)
-        meta = request_metrics.current().meta(cache="miss")
+        meta = request_metrics.current().meta(cache=cache_status)
         return Response({**body, "map": {**body["map"], "url": url}, "meta": meta})
 
 
@@ -64,7 +87,7 @@ def route_map(request):
         query = RouteQuerySerializer(data=request.GET)
         query.is_valid(raise_exception=True)
         start, finish = query.validated_data["start"], query.validated_data["finish"]
-        body = plan_trip_body(start, finish)
+        body, _ = plan_trip_body(start, finish)
     except Exception as exc:  # describe_error logs the unexpected ones
         status_code, body = describe_error(exc, request)
         error = {**body["error"], "details": _as_text(body["error"]["details"])}
