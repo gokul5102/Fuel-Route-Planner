@@ -76,6 +76,24 @@ class GeocodingFailed(LocationError):
         super().__init__(f"The geocoding service failed for {query!r}; try again later.", query)
 
 
+class SameStartAndFinish(LocationError):
+    code = "INVALID_INPUT"
+    status_code = 400
+
+    def __init__(self, start: "ResolvedLocation", finish: "ResolvedLocation") -> None:
+        super().__init__(
+            f"{start.query!r} and {finish.query!r} are the same place; there is no trip to plan.",
+            start.query,
+        )
+        self.details = {"start": start.query, "finish": finish.query}
+
+
+def check_distinct(start: "ResolvedLocation", finish: "ResolvedLocation") -> None:
+    """Start and finish must differ by more than ~10 m (4 decimal places)."""
+    if (round(start.lat, 4), round(start.lon, 4)) == (round(finish.lat, 4), round(finish.lon, 4)):
+        raise SameStartAndFinish(start, finish)
+
+
 def resolve_location(query: str) -> ResolvedLocation:
     match = COORDINATES.match(query)
     if match:

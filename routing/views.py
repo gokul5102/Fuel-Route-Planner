@@ -4,7 +4,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from routing.serializers import serialize_trip_plan
+from routing.services.locations import LocationError
 from routing.services.planner import plan_trip
+
+
+def location_error_response(error: LocationError) -> Response:
+    """The error envelope for a start or finish that cannot be used."""
+    body = {"code": error.code, "message": str(error), "details": error.details}
+    return Response({"error": body}, status=error.status_code)
 
 
 class RouteView(APIView):
@@ -15,11 +22,18 @@ class RouteView(APIView):
 
     @extend_schema(
         parameters=[
-            OpenApiParameter("start", str, required=True, description='"lat,lng"'),
-            OpenApiParameter("finish", str, required=True, description='"lat,lng"'),
+            OpenApiParameter(
+                "start", str, required=True, description='"lat,lng", "City, ST" or a US address'
+            ),
+            OpenApiParameter(
+                "finish", str, required=True, description='"lat,lng", "City, ST" or a US address'
+            ),
         ],
         responses=OpenApiTypes.OBJECT,
     )
     def get(self, request):
-        trip = plan_trip(request.query_params["start"], request.query_params["finish"])
+        try:
+            trip = plan_trip(request.query_params["start"], request.query_params["finish"])
+        except LocationError as error:
+            return location_error_response(error)
         return Response(serialize_trip_plan(trip))
