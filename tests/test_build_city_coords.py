@@ -155,13 +155,24 @@ def sleeps(monkeypatch):
     return calls
 
 
+def found(lat: float, lon: float, region: str) -> dict:
+    """One Nominatim search result; `region` is its ISO 3166-2 code, e.g. "US-TX"."""
+    return {"lat": str(lat), "lon": str(lon), "address": {"ISO3166-2-lvl4": region}}
+
+
 def nominatim_answers(query: str, country: str, body: list) -> None:
     responses.get(
         NOMINATIM_SEARCH,
         json=body,
         match=[
             matchers.query_param_matcher(
-                {"q": query, "format": "json", "limit": "1", "countrycodes": country}
+                {
+                    "q": query,
+                    "format": "json",
+                    "limit": "1",
+                    "countrycodes": country,
+                    "addressdetails": "1",
+                }
             ),
             matchers.header_matcher({"User-Agent": "test-agent/1.0"}),
         ],
@@ -174,8 +185,8 @@ def test_cities_census_cannot_match_fall_back_to_nominatim_one_per_second(
 ):
     settings.NOMINATIM_USER_AGENT = "test-agent/1.0"
     write_prices(settings, ("Smithtown", "NY"), ("Tiny Spot", "TX"), ("Toronto", "ON"))
-    nominatim_answers("Tiny Spot, TX", "us", [{"lat": "31.5", "lon": "-97.1"}])
-    nominatim_answers("Toronto, ON", "ca", [{"lat": "43.65", "lon": "-79.38"}])
+    nominatim_answers("Tiny Spot, TX", "us", [found(31.5, -97.1, "US-TX")])
+    nominatim_answers("Toronto, ON", "ca", [found(43.65, -79.38, "CA-ON")])
     out = io.StringIO()
 
     call_command("build_city_coords", stdout=out)
@@ -227,7 +238,7 @@ def test_a_failed_nominatim_request_is_left_out_so_the_next_run_retries_it(data_
 def test_a_rerun_skips_cities_already_in_the_file_and_makes_no_nominatim_calls(data_dir, settings):
     settings.NOMINATIM_USER_AGENT = "test-agent/1.0"
     write_prices(settings, ("Smithtown", "NY"), ("Tiny Spot", "TX"), ("Atlantis", "TX"))
-    nominatim_answers("Tiny Spot, TX", "us", [{"lat": "31.5", "lon": "-97.1"}])
+    nominatim_answers("Tiny Spot, TX", "us", [found(31.5, -97.1, "US-TX")])
     nominatim_answers("Atlantis, TX", "us", [])
     call_command("build_city_coords", stdout=io.StringIO())
     first_run = settings.CITY_COORDS_FILE.read_text()
@@ -245,13 +256,24 @@ def test_a_rerun_skips_cities_already_in_the_file_and_makes_no_nominatim_calls(d
 def test_a_rerun_only_looks_up_cities_new_to_the_price_file(data_dir, settings):
     settings.NOMINATIM_USER_AGENT = "test-agent/1.0"
     write_prices(settings, ("Tiny Spot", "TX"))
-    nominatim_answers("Tiny Spot, TX", "us", [{"lat": "31.5", "lon": "-97.1"}])
+    nominatim_answers("Tiny Spot, TX", "us", [found(31.5, -97.1, "US-TX")])
     call_command("build_city_coords", stdout=io.StringIO())
     responses.calls.reset()
     write_prices(settings, ("Tiny Spot", "TX"), ("Toronto", "ON"))
-    nominatim_answers("Toronto, ON", "ca", [{"lat": "43.65", "lon": "-79.38"}])
+    nominatim_answers("Toronto, ON", "ca", [found(43.65, -79.38, "CA-ON")])
 
     call_command("build_city_coords", stdout=io.StringIO())
 
     assert [call.request.params["q"] for call in responses.calls] == ["Toronto, ON"]
     assert [r["city"] for r in read_csv(settings.CITY_COORDS_FILE)] == ["Tiny Spot", "Toronto"]
+
+
+@responses.activate
+def test_a_nominatim_match_in_the_wrong_state_is_recorded_as_unresolved(data_dir, settings):
+    settings.NOMINATIM_USER_AGENT = "test-agent/1.0"
+    write_prices(settings, ("La Place", "LA"))
+    nominatim_answers("La Place, LA", "us", [found(32.37, -85.86, "US-AL")])
+
+    call_command("build_city_coords", stdout=io.StringIO())
+
+    assert read_csv(settings.CITY_COORDS_FILE)[0]["source"] == "unresolved"

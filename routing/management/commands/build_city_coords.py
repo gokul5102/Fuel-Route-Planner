@@ -122,10 +122,11 @@ class Command(BaseCommand):
             time.sleep(NOMINATIM_INTERVAL_SECONDS)
         self.nominatim_calls += 1
         country = "ca" if state in CANADIAN_PROVINCES else "us"
-        coords = nominatim.search(f"{city}, {state}", country_code=country)
-        if coords is None:
+        place = nominatim.search(f"{city}, {state}", country_code=country)
+        # Free-text search can land in another state (e.g. "La Place, LA" in Alabama).
+        if place is None or place.region != f"{country.upper()}-{state}":
             return "", "", "unresolved"
-        return *coords, "nominatim"
+        return place.lat, place.lon, "nominatim"
 
     def print_summary(self, price_rows: Counter[tuple[str, str]]) -> None:
         with open(settings.CITY_COORDS_FILE, newline="", encoding="utf-8") as f:
