@@ -66,7 +66,7 @@ def osrm(settings):
             OSRM_URL,
             match=[
                 responses.matchers.query_param_matcher(
-                    {"overview": "full", "geometries": "geojson"}
+                    {"overview": "full", "geometries": "geojson", "alternatives": "true"}
                 )
             ],
             json=json.loads(OSRM_FIXTURE.read_text()),

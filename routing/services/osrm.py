@@ -1,4 +1,5 @@
-"""The OSRM routing client: one call returns the Route's full geometry, distance and duration.
+"""The OSRM routing client: one call returns each Route (the fastest plus OSRM's alternatives)
+with its full geometry, distance and duration.
 
 The public demo server allows at most 1 request per second and has no uptime
 guarantee, so there are no retries and a short timeout. Note OSRM wants lon,lat.
@@ -61,7 +62,7 @@ def fetch_routes(start: tuple[float, float], finish: tuple[float, float]) -> lis
     try:
         response = requests.get(
             url,
-            params={"overview": "full", "geometries": "geojson"},
+            params={"overview": "full", "geometries": "geojson", "alternatives": "true"},
             timeout=settings.HTTP_TIMEOUT_SECONDS,
         )
         body = response.json()
