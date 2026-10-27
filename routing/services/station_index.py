@@ -65,12 +65,19 @@ _lock = threading.Lock()
 
 
 def get_station_index() -> StationIndex:
-    """The shared index, built from the Station table on first use."""
+    """The shared index, built from the Station table on first use.
+
+    An empty table is not remembered (the Stations probably aren't loaded yet), so
+    Stations loaded later are picked up without a restart.
+    """
     global _index
     if _index is None:
         with _lock:
             if _index is None:
-                _index = StationIndex.from_database()
+                index = StationIndex.from_database()
+                if not index.stations:
+                    return index
+                _index = index
     return _index
 
 
@@ -93,4 +100,10 @@ def warm_station_index() -> None:
     except DatabaseError as error:
         logger.warning("Station index not built at startup (%s); run `make load`.", error)
     else:
-        logger.info("Station index built: %d Stations.", stations)
+        if stations:
+            logger.info("Station index built: %d Stations.", stations)
+        else:
+            logger.warning(
+                "No Stations in the database; run `make load`. "
+                "Until then every plan fails with NO_STATION_AT_START."
+            )

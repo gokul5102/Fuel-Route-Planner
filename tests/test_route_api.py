@@ -9,6 +9,7 @@ Milwaukee and Fillmore are cheap but off the Route.
 """
 
 import json
+import logging
 from decimal import Decimal
 from pathlib import Path
 
@@ -16,7 +17,7 @@ import pytest
 import responses
 
 from routing.models import Station
-from routing.services.station_index import get_station_index
+from routing.services.station_index import get_station_index, warm_station_index
 
 OSRM_FIXTURE = Path(__file__).parent / "fixtures" / "osrm_chicago_los_angeles.json"
 OSRM_URL = "https://osrm.test/route/v1/driving/-87.6298,41.8781;-118.2437,34.0522"
@@ -42,6 +43,10 @@ STATIONS = [
 
 @pytest.fixture
 def stations(db):
+    add_stations()
+
+
+def add_stations() -> None:
     Station.objects.bulk_create(
         Station(
             opis_id=opis_id,
@@ -148,3 +153,16 @@ def test_a_request_never_queries_the_database(client, stations, osrm, django_ass
 
     with django_assert_num_queries(0):
         assert plan(client).status_code == 200
+
+
+@pytest.mark.django_db
+def test_stations_loaded_after_an_empty_start_are_used_without_a_restart(client, osrm, caplog):
+    with caplog.at_level(logging.WARNING, logger="routing.services.station_index"):
+        warm_station_index()  # the server started before `make load`
+
+    assert "make load" in caplog.text
+    assert plan(client).json()["error"]["code"] == "NO_STATION_AT_START"
+
+    add_stations()
+
+    assert plan(client).status_code == 200
