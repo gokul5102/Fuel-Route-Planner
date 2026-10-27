@@ -1,0 +1,6 @@
+city,state,lat,lon,source
+Big Cabin,OK,36.537,-95.221,census
+Tomah,WI,43.981,-90.504,census
+Kansas City,MO,39.099,-94.578,census
+Lost Town,TX,,,unresolved
+Calgary,AB,51.045,-114.057,nominatim
