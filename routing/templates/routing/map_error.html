@@ -1,26 +1,40 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>No map: {{ error.code }}</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem;
-           color: #111827; line-height: 1.5; }
-    code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
-  </style>
-</head>
-<body>
-  <h1>The map could not be drawn</h1>
-  <p>{{ error.message }}</p>
-  <p>Error code: <code>{{ error.code }}</code></p>
-  {% if error.details %}
-    <ul>
-      {% for field, problem in error.details.items %}
-        <li><strong>{{ field }}</strong>: {{ problem }}</li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-  <p>The same request to <code>/api/route/</code> returns this error as JSON.</p>
-</body>
-</html>
+{% extends "routing/base.html" %}
+
+{% block title %}No map: {{ error.code }}{% endblock %}
+
+{% block style %}
+<style>
+  .error-page { max-width: 34rem; margin: 10vh auto; padding: 0 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
+  .card h1 { font-size: 20px; margin: 6px 0 8px; }
+  .code { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--danger-soft);
+          color: var(--finish); font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .details { margin: 12px 0 0; padding-left: 18px; color: var(--muted); }
+  .hint { margin-top: 16px; color: var(--muted); font-size: 13px; }
+  .hint code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .card form { margin-top: 20px; }
+</style>
+{% endblock %}
+
+{% block body %}
+<main class="error-page">
+  <div class="card">
+    <span class="code">{{ error.code }}</span>
+    <h1>The map could not be drawn</h1>
+    <p>{{ error.message }}</p>
+    {% if error.details %}
+      <ul class="details">
+        {% for field, problem in error.details.items %}
+          <li><strong>{{ field }}</strong>: {{ problem }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    <form class="trip-form" method="get" aria-label="Plan another trip">
+      <input name="start" value="{{ start }}" placeholder="Start, e.g. Chicago, IL" aria-label="Start" required>
+      <input name="finish" value="{{ finish }}" placeholder="Finish, e.g. Denver, CO" aria-label="Finish" required>
+      <button type="submit">Plan</button>
+    </form>
+    <p class="hint">The same request to <code>/api/route/</code> returns this error as JSON.</p>
+  </div>
+</main>
+{% endblock %}

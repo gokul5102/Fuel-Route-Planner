@@ -15,8 +15,6 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "fuelroute.settings")
 
 application = get_asgi_application()
 
-from routing.services.places import get_place_index  # noqa: E402
-from routing.services.station_index import warm_station_index  # noqa: E402
+from routing.startup import warm_up  # noqa: E402
 
-warm_station_index()  # one query, then every request uses the in-memory index
-get_place_index()  # the "City, ST" lookup (~0.1 s from data/us_places.csv)
+warm_up()  # Station index, "City, ST" lookup and the OSRM connection, before the first request

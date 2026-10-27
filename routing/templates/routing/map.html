@@ -1,110 +1,302 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Fuel plan: {{ start }} to {{ finish }}</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <style>
-    html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
-    #map { height: 100%; }
-    .summary { background: #fff; padding: 8px 12px; border-radius: 6px;
-               box-shadow: 0 1px 4px rgba(0, 0, 0, .3); line-height: 1.5; }
-    .summary h1 { font-size: 15px; margin: 0 0 4px; }
-    .stop-number { background: #1d4ed8; color: #fff; border: 2px solid #fff; border-radius: 50%;
-                   font: bold 12px/20px system-ui, sans-serif; text-align: center;
-                   box-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
-  </style>
-</head>
-<body>
-  <div id="map"></div>
-  {{ plan|json_script:"plan" }}
-  <script>
-    // The plan is the same JSON body GET /api/route/ returns; text is set with textContent only.
-    const plan = JSON.parse(document.getElementById("plan").textContent);
-    const features = plan.map.geojson.features;
-    const ofKind = (kind) => features.filter((f) => f.properties.kind === kind);
-    const money = (value) => "$" + value.toFixed(2);
+{% extends "routing/base.html" %}
 
-    // Leaflet must have a view before vector layers are added, so fit the chosen Route first.
-    const chosenRoute = ofKind("route").find((route) => route.properties.chosen);
-    const map = L.map("map").fitBounds(L.geoJSON(chosenRoute).getBounds(), { padding: [20, 20] });
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+{% block title %}Fuel plan: {{ start }} to {{ finish }}{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+{% endblock %}
+
+{% block style %}
+<style>
+  .layout { display: grid; grid-template-columns: 400px 1fr; height: 100dvh; }
+  .panel { display: flex; flex-direction: column; gap: 18px; overflow-y: auto; padding: 20px;
+           background: var(--panel); border-right: 1px solid var(--line); }
+  #map { height: 100%; min-height: 0; background: #e5e7eb; }
+
+  .trip h1 { font-size: 18px; line-height: 1.3; margin-top: 4px; }
+  .trip h1 .arrow { color: var(--muted); font-weight: 400; padding: 0 2px; }
+
+  .hero { padding: 16px; border-radius: var(--radius); background: var(--accent-soft); }
+  .hero .value { font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; margin: 2px 0; }
+  .hero .sub { color: #334155; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stats div { padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); }
+  .stats dt { color: var(--muted); font-size: 12px; }
+  .stats dd { font-size: 16px; font-weight: 600; }
+
+  .section h2 { margin-bottom: 8px; }
+
+  .routes { width: 100%; border-collapse: collapse; }
+  .routes th { color: var(--muted); font-size: 12px; font-weight: 500; text-align: right; padding: 0 0 6px; }
+  .routes th:first-child, .routes td:first-child { text-align: left; }
+  .routes td { padding: 8px 0; border-top: 1px solid var(--line); text-align: right; }
+  .routes tr[data-route] { cursor: pointer; }
+  .routes tr[data-route]:hover td { background: #f8fafc; }
+  .swatch { display: inline-block; width: 18px; height: 0; margin-right: 6px; vertical-align: middle;
+            border-top: 4px solid var(--accent); border-radius: 2px; }
+  .swatch.alternative { border-top: 3px dashed var(--alternative); }
+  .delta { display: block; color: var(--muted); font-size: 12px; }
+  .badge { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: #fff;
+           font-size: 11px; font-weight: 600; vertical-align: 1px; }
+
+  .stops { list-style: none; padding: 0; display: flex; flex-direction: column; }
+  .stops button { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: start;
+                  width: 100%; padding: 9px 6px; border: 0; border-top: 1px solid var(--line);
+                  background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+  .stops li:first-child button { border-top: 0; }
+  .stops button:hover, .stops button.active { background: var(--accent-soft); border-radius: 8px; }
+  .stops button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
+  .stops .name { font-weight: 600; font-size: 13px; }
+  .stops .where, .stops .detail { color: var(--muted); font-size: 12px; }
+  .stops .cost { font-weight: 600; text-align: right; }
+  .empty { color: var(--muted); }
+
+  .stop-icon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+               background: var(--accent); color: #fff; border: 2px solid #fff; font: 700 12px var(--font);
+               box-shadow: 0 1px 4px rgba(15, 23, 42, .45); transition: transform .12s; }
+  .stop-icon.list { width: 24px; height: 24px; box-shadow: none; border: 0; font-size: 11px; }
+  .stop-icon.active { transform: scale(1.35); background: #0b2a8a; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 12px; }
+  .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  .note { color: var(--muted); font-size: 12px; }
+
+  .popup .title { font-weight: 600; }
+  .popup .muted { color: var(--muted); }
+
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; grid-template-rows: 50dvh 1fr; }
+    #map { order: -1; }
+    .panel { border-right: 0; border-top: 1px solid var(--line); padding: 16px; }
+    .trip-form { grid-template-columns: 1fr 1fr; }
+    .trip-form button { grid-column: span 2; }
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="layout">
+  <aside class="panel" aria-label="Fuel plan">
+    <form class="trip-form" method="get" aria-label="Plan another trip">
+      <input name="start" value="{{ start }}" aria-label="Start" required>
+      <input name="finish" value="{{ finish }}" aria-label="Finish" required>
+      <button type="submit">Plan</button>
+    </form>
+
+    <header class="trip">
+      <p class="eyebrow">Cheapest fuel plan</p>
+      <h1 id="trip-title"></h1>
+    </header>
+
+    <section class="hero" aria-label="Total fuel cost">
+      <p class="eyebrow">Total fuel cost</p>
+      <p class="value num" id="total-cost"></p>
+      <p class="sub num" id="total-sub"></p>
+    </section>
+
+    <dl class="stats num">
+      <div><dt>Distance</dt><dd id="distance"></dd></div>
+      <div><dt>Drive time</dt><dd id="duration"></dd></div>
+      <div><dt>Fuel stops</dt><dd id="stop-count"></dd></div>
+    </dl>
+
+    <section class="section" id="routes-section">
+      <h2 class="eyebrow">Routes compared</h2>
+      <table class="routes num">
+        <thead><tr><th>Route</th><th>Distance</th><th>Time</th><th>Fuel</th></tr></thead>
+        <tbody id="routes"></tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2 class="eyebrow">Fuel stops</h2>
+      <ol class="stops" id="stops"></ol>
+    </section>
+
+    <footer class="section">
+      <div class="legend">
+        <span><span class="swatch"></span>Chosen Route</span>
+        <span><span class="swatch alternative"></span>Alternative</span>
+        <span><span class="dot" style="background: var(--start)"></span>Start</span>
+        <span><span class="dot" style="background: var(--finish)"></span>Finish</span>
+      </div>
+      <p class="note" id="assumptions"></p>
+    </footer>
+  </aside>
+  <div id="map" role="region" aria-label="Map of the Route and Fuel stops"></div>
+</div>
+{{ plan|json_script:"plan" }}
+
+<script>
+  // The plan is the same JSON body GET /api/route/ returns. All text is set with textContent.
+  const plan = JSON.parse(document.getElementById("plan").textContent);
+  const features = plan.map.geojson.features;
+  const ofKind = (kind) => features.filter((f) => f.properties.kind === kind);
+
+  const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+  const oneDecimal = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+  const miles = (value) => oneDecimal.format(value) + " mi";
+  const pricePerGallon = (value) => "$" + value.toFixed(3) + "/gal";
+  const gallons = (value) => oneDecimal.format(value) + " gal";
+  function hours(value) {
+    const total = Math.round(value * 60);
+    return Math.floor(total / 60) + " h " + String(total % 60).padStart(2, "0") + " min";
+  }
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+  const setText = (id, text) => { document.getElementById(id).textContent = text; };
+
+  // ---- Summary panel
+  const title = document.getElementById("trip-title");
+  title.append(plan.start.query, element("span", "arrow", " → "), plan.finish.query);
+  setText("total-cost", usd.format(plan.total_fuel_cost));
+  const average = plan.total_gallons ? plan.total_fuel_cost / plan.total_gallons : 0;
+  setText("total-sub", gallons(plan.total_gallons) + " at an average of " + pricePerGallon(average));
+  setText("distance", miles(plan.route.distance_miles));
+  setText("duration", hours(plan.route.duration_hours));
+  setText("stop-count", String(plan.fuel_stops.length));
+  const a = plan.assumptions;
+  setText("assumptions",
+    a.range_miles + "-mile Range at " + a.mpg + " MPG, starting with an empty tank. Stations within " +
+    a.corridor_miles + " miles of the Route count as on it; Station locations are city-level.");
+
+  // ---- Map. Leaflet needs a view before vector layers are added, so fit the chosen Route first.
+  const chosenRoute = ofKind("route").find((route) => route.properties.chosen);
+  const map = L.map("map", { zoomSnap: 0.25 }).fitBounds(L.geoJSON(chosenRoute).getBounds(), { padding: [32, 32] });
+  // CARTO's light basemap keeps the Route and stops readable. Tile servers require a Referer,
+  // which Django's same-origin Referrer-Policy would otherwise strip.
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    subdomains: "abcd",
+    maxZoom: 19,
+    referrerPolicy: "strict-origin-when-cross-origin",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
+                 '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+  }).addTo(map);
+
+  // Alternatives first (grey, dashed, underneath), then the chosen Route (blue, on top).
+  const routeLayers = [];
+  for (const route of ofKind("route").sort((x, y) => x.properties.chosen - y.properties.chosen)) {
+    const chosen = route.properties.chosen;
+    const layer = L.geoJSON(route, {
+      style: chosen ? { color: "#1d4ed8", weight: 5, opacity: 0.9 }
+                    : { color: "#94a3b8", weight: 4, opacity: 0.8, dashArray: "7 7" },
     }).addTo(map);
+    routeLayers.push({ route, layer });
+  }
 
-    function lines(rows) {
-      const box = document.createElement("div");
-      for (const row of rows) {
-        const line = document.createElement("div");
-        line.textContent = row;
-        box.appendChild(line);
-      }
-      return box;
-    }
-
-    // Alternatives first (grey, underneath), then the chosen Route (blue, on top).
-    for (const route of ofKind("route").sort((a, b) => a.properties.chosen - b.properties.chosen)) {
-      const p = route.properties;
-      const layer = L.geoJSON(route, {
-        style: p.chosen
-          ? { color: "#1d4ed8", weight: 5, opacity: 0.9 }
-          : { color: "#6b7280", weight: 4, opacity: 0.6, dashArray: "6 6" },
-      }).addTo(map);
-      layer.bindPopup(lines([
-        p.chosen ? "Chosen Route" : "Alternative Route",
-        p.distance_miles.toFixed(1) + " mi, " + p.duration_hours.toFixed(1) + " h",
-        p.total_fuel_cost === null ? "Cannot be fuelled (" + p.failure_code + ")"
-                                   : "Fuel " + money(p.total_fuel_cost),
-      ]));
-    }
-
-    for (const [kind, colour, label] of [["start", "#16a34a", "Start"], ["finish", "#dc2626", "Finish"]]) {
-      for (const point of ofKind(kind)) {
-        const [lon, lat] = point.geometry.coordinates;
-        L.circleMarker([lat, lon], { radius: 9, color: "#fff", weight: 2, fillColor: colour, fillOpacity: 1 })
-          .bindPopup(lines([label + ": " + point.properties.query]))
-          .addTo(map);
-      }
-    }
-
-    for (const stop of ofKind("fuel_stop")) {
-      const p = stop.properties;
-      const [lon, lat] = stop.geometry.coordinates;
-      const number = document.createElement("div");
-      number.textContent = p.number;
-      L.marker([lat, lon], {
-        icon: L.divIcon({ html: number, className: "stop-number", iconSize: [24, 24] }),
-        title: "Fuel stop " + p.number,
-      })
-        .bindPopup(lines([
-          p.number + ". " + p.name,
-          p.city + ", " + p.state,
-          "$" + p.price_per_gallon.toFixed(3) + " / gal",
-          "Mile marker " + p.mile_marker.toFixed(1),
-          p.gallons.toFixed(3) + " gal for " + money(p.cost),
-        ]))
+  for (const [kind, colour, label] of [["start", "#16a34a", "Start"], ["finish", "#dc2626", "Finish"]]) {
+    for (const point of ofKind(kind)) {
+      const [lon, lat] = point.geometry.coordinates;
+      L.circleMarker([lat, lon], { radius: 8, color: "#fff", weight: 3, fillColor: colour, fillOpacity: 1 })
+        .bindTooltip(label + ": " + point.properties.query)
         .addTo(map);
     }
+  }
 
-    const summary = L.control({ position: "topright" });
-    summary.onAdd = () => {
-      const box = lines([
-        plan.route.distance_miles.toFixed(1) + " miles, " + plan.route.duration_hours.toFixed(1) + " hours",
-        "Total fuel cost " + money(plan.total_fuel_cost) + " (" + plan.total_gallons.toFixed(1) + " gal)",
-        plan.fuel_stops.length + " Fuel stops",
-      ]);
-      const title = document.createElement("h1");
-      title.textContent = plan.start.query + " to " + plan.finish.query;
-      box.prepend(title);
-      box.className = "summary";
-      return box;
-    };
-    summary.addTo(map);
-  </script>
-</body>
-</html>
+  // ---- Fuel stops: one marker and one list row each, linked both ways.
+  function popupContent(stop) {
+    const box = element("div", "popup");
+    box.append(
+      element("div", "title", stop.number + ". " + stop.name),
+      element("div", "muted", stop.city + ", " + stop.state + " · mile " + oneDecimal.format(stop.mile_marker)),
+      element("div", "num", gallons(stop.gallons) + " at " + pricePerGallon(stop.price_per_gallon) + " = " + usd.format(stop.cost)),
+    );
+    return box;
+  }
+
+  const list = document.getElementById("stops");
+  const rows = new Map();
+  let active = null;
+  function activate(number, { pan } = {}) {
+    if (active) {
+      active.row.classList.remove("active");
+      active.icon.classList.remove("active");
+    }
+    active = rows.get(number);
+    active.row.classList.add("active");
+    active.icon.classList.add("active");
+    if (pan) {
+      map.flyTo(active.marker.getLatLng(), Math.max(map.getZoom(), 9), { duration: 0.6 });
+      active.marker.openPopup();
+    } else {
+      active.row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }
+
+  for (const feature of ofKind("fuel_stop")) {
+    const stop = feature.properties;
+    const [lon, lat] = feature.geometry.coordinates;
+    const icon = element("div", "stop-icon", String(stop.number));
+    const marker = L.marker([lat, lon], {
+      icon: L.divIcon({ html: icon, className: "", iconSize: [26, 26] }),
+      title: "Fuel stop " + stop.number + ": " + stop.name,
+      zIndexOffset: 1000 - stop.number,
+    }).bindPopup(popupContent(stop)).addTo(map);
+    marker.on("click", () => activate(stop.number));
+
+    const button = element("button");
+    button.type = "button";
+    const where = element("div");
+    where.append(
+      element("div", "name", stop.name),
+      element("div", "where", stop.city + ", " + stop.state + " · mile " + oneDecimal.format(stop.mile_marker)),
+    );
+    const cost = element("div");
+    cost.append(
+      element("div", "cost num", usd.format(stop.cost)),
+      element("div", "detail num", gallons(stop.gallons) + " @ " + pricePerGallon(stop.price_per_gallon)),
+    );
+    button.append(element("span", "stop-icon list", String(stop.number)), where, cost);
+    button.addEventListener("click", () => activate(stop.number, { pan: true }));
+    const item = element("li");
+    item.append(button);
+    list.append(item);
+    rows.set(stop.number, { row: button, icon, marker });
+  }
+  if (!rows.size) list.append(element("li", "empty", "No Fuel stops needed."));
+
+  // ---- Routes compared: the chosen Route, then each alternative with its cost difference.
+  const routesBody = document.getElementById("routes");
+  function routeRow(label, swatchClass, summary, chosen) {
+    const row = element("tr");
+    const name = element("td");
+    name.append(element("span", "swatch " + swatchClass), label);
+    if (chosen) name.append(element("span", "badge", "cheapest"));
+    const fuel = element("td");
+    if (summary.total_fuel_cost === null) {
+      fuel.append(element("span", "delta", "can't be fuelled"));
+    } else {
+      fuel.append(usd.format(summary.total_fuel_cost));
+      if (!chosen) {
+        const extra = summary.total_fuel_cost - plan.total_fuel_cost;
+        fuel.append(element("span", "delta", "+" + usd.format(extra)));
+      }
+    }
+    row.append(name, element("td", "", miles(summary.distance_miles)), element("td", "", hours(summary.duration_hours)), fuel);
+    return row;
+  }
+  routesBody.append(routeRow("Chosen", "", { ...plan.route, total_fuel_cost: plan.total_fuel_cost }, true));
+  plan.alternatives.forEach((summary, i) => routesBody.append(routeRow("Alternative " + (i + 1), "alternative", summary, false)));
+  if (!plan.alternatives.length) document.getElementById("routes-section").hidden = true;
+  // Clicking a row fits the map to that Route (matched by its distance).
+  const summaries = [plan.route, ...plan.alternatives];
+  routesBody.querySelectorAll("tr").forEach((row, i) => {
+    const entry = routeLayers.find((r) => r.route.properties.chosen === (i === 0) &&
+                                          r.route.properties.distance_miles === summaries[i].distance_miles);
+    if (!entry) return;
+    row.dataset.route = String(i);
+    row.addEventListener("click", () => map.flyToBounds(entry.layer.getBounds(), { padding: [32, 32], duration: 0.6 }));
+  });
+
+  // The grid can resize the map container (e.g. rotating a phone).
+  new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById("map"));
+</script>
+{% endblock %}

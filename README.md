@@ -224,7 +224,8 @@ public OSRM demo server.
 
 | Request | Time (server) | External calls |
 |---|---|---|
-| Chicago, IL → Los Angeles, CA, uncached | 1.51 s: OSRM 1.39 s, corridor 26 ms (2 Routes), optimizer 0.9 ms | 1 |
+| Chicago, IL → Los Angeles, CA, uncached | 1.26 s: OSRM 1.17 s, corridor 14 ms (2 Routes), optimizer 0.8 ms | 1 |
+| Denver, CO → Kansas City, MO, first request after server start | 0.37 s | 1 |
 | Same request again (cache hit) | 2.0–2.6 ms | 0 |
 | Map page for it, after the API call | 11.5 ms | 0 |
 | Dallas, TX → Houston, TX, uncached | 3.0–4.7 s, almost all OSRM | 1 |
@@ -235,6 +236,9 @@ Other measurements:
 - **Response size.** The Chicago→LA JSON is 64.7 KB, because the map lines are simplified
   for display. OSRM's own answer for that trip is about 210 KB as `polyline6`, against
   about 1 MB as GeoJSON, which is why the API asks for `polyline6`.
+- **Keep-alive connection.** All external calls share one keep-alive session, and the server
+  opens the OSRM connection at startup. A reused TLS connection saves about 0.3 s per call
+  (a small OSRM request: 0.48 s fresh, 0.15 s reused).
 - **Station index.** Building the KD-tree over 6,738 Stations takes 3.2 ms. Querying it
   with the 2,016 one-mile samples of Chicago→LA takes 2.7 ms, where brute-force numpy takes
   328 ms for the same answer.
@@ -250,7 +254,7 @@ Other measurements:
 |---|---|---|
 | [OSRM demo server](https://router.project-osrm.org) | routing, 1 call per uncached request | at most 1 request/s, non-commercial use, no uptime guarantee |
 | [Nominatim](https://nominatim.openstreetmap.org) | free-text addresses only | at most 1 request/s, an identifying User-Agent, cache the results ([policy](https://operations.osmfoundation.org/policies/nominatim/)) |
-| OpenStreetMap tiles and Leaflet (unpkg) | the map page, loaded by the browser | no API key |
+| CARTO light basemap (OpenStreetMap data) and Leaflet (unpkg) | the map page, loaded by the browser | no API key; tiles need a Referer, which the tile layer sends explicitly |
 | US Census Gazetteer 2024 | Station and city coordinates, offline only | public domain |
 
 **Timeouts.** Every OSRM and Nominatim call gets 10 seconds in total, from connecting to

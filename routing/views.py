@@ -90,7 +90,7 @@ class RouteView(APIView):
 
 @require_GET
 def route_map(request):
-    """The same plan as GET /api/route/, drawn on a Leaflet map with OpenStreetMap tiles.
+    """The same plan as GET /api/route/, drawn on a Leaflet map with a trip summary panel.
 
     A failure renders a short HTML page with the same error code and status as the API.
     """
@@ -102,7 +102,12 @@ def route_map(request):
     except Exception as exc:  # describe_error logs the unexpected ones
         status_code, body = describe_error(exc, request)
         error = {**body["error"], "details": _as_text(body["error"]["details"])}
-        return render(request, "routing/map_error.html", {"error": error}, status=status_code)
+        context = {
+            "error": error,
+            "start": request.GET.get("start", ""),  # refill the "plan another trip" form
+            "finish": request.GET.get("finish", ""),
+        }
+        return render(request, "routing/map_error.html", context, status=status_code)
     return render(request, "routing/map.html", {"plan": body, "start": start, "finish": finish})
 
 

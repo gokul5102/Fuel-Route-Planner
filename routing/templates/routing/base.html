@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Fuel route planner{% endblock %}</title>
+  {% block head %}{% endblock %}
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --panel: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --accent: #1d4ed8;
+      --accent-soft: #e8efff;
+      --start: #16a34a;
+      --finish: #dc2626;
+      --alternative: #94a3b8;
+      --danger-soft: #fef2f2;
+      --radius: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font); }
+    h1, h2, p, ol, dl, dd { margin: 0; }
+    .num { font-variant-numeric: tabular-nums; }
+    .eyebrow { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+
+    /* "Plan another trip": a plain GET form to this same page. */
+    .trip-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; }
+    .trip-form input {
+      min-width: 0; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px;
+      font: inherit; color: var(--ink); background: #fff;
+    }
+    .trip-form button {
+      padding: 7px 12px; border: 0; border-radius: 7px; background: var(--accent); color: #fff;
+      font: 600 13px var(--font); cursor: pointer;
+    }
+    .trip-form input:focus-visible, .trip-form button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  </style>
+  {% block style %}{% endblock %}
+</head>
+<body>
+  {% block body %}{% endblock %}
+</body>
+</html>

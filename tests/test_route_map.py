@@ -133,7 +133,10 @@ def test_the_map_page_draws_the_same_plan_with_leaflet(client, stations, osrm):
     assert response["Content-Type"].startswith("text/html")
     html = response.content.decode()
     assert "leaflet@1.9.4" in html
-    assert "tile.openstreetmap.org" in html
+    # Tile servers block browser requests without a Referer; Django's default same-origin
+    # Referrer-Policy strips it, so the tile layer must ask for one explicitly.
+    assert "basemaps.cartocdn.com" in html
+    assert 'referrerPolicy: "strict-origin-when-cross-origin"' in html
     shown = embedded_plan(html)
     assert shown["total_fuel_cost"] == 717.34
     assert shown["route"] == {"distance_miles": 2018.03, "duration_hours": 35.36}
@@ -149,6 +152,8 @@ def test_the_map_page_shows_a_readable_error_for_bad_input(client):
     html = response.content.decode()
     assert "INVALID_INPUT" in html
     assert "start" in html
+    # the "plan another trip" form keeps what was typed
+    assert f'name="finish" value="{LOS_ANGELES}"' in html
 
 
 def test_the_map_page_shows_the_same_error_code_as_the_api(client, db, settings):
