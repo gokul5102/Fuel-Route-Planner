@@ -48,6 +48,27 @@ def serialize_trip_plan(trip: TripPlan) -> dict:
     }
 
 
+def with_queries(body: dict, start: str, finish: str) -> dict:
+    """A plan body, perhaps cached for another spelling, showing this request's own text.
+
+    "chicago, il" can be served the plan cached for "Chicago, IL"; its `start.query` and
+    map labels still say "chicago, il". Returns a new dict and never changes `body`.
+    """
+    queries = {"start": start, "finish": finish}
+    features = [
+        {**feature, "properties": {**feature["properties"], "query": queries[kind]}}
+        if (kind := feature["properties"]["kind"]) in queries
+        else feature
+        for feature in body["map"]["geojson"]["features"]
+    ]
+    return {
+        **body,
+        "start": {**body["start"], "query": start},
+        "finish": {**body["finish"], "query": finish},
+        "map": {**body["map"], "geojson": {**body["map"]["geojson"], "features": features}},
+    }
+
+
 def _route(route: RoutedPath) -> dict:
     return {
         "distance_miles": round(route.distance_miles, 2),

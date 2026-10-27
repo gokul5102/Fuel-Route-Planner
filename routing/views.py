@@ -19,7 +19,7 @@ from routing.api_docs import (
     ROUTE_SUMMARY,
 )
 from routing.errors import describe_error
-from routing.serializers import RouteQuerySerializer, serialize_trip_plan
+from routing.serializers import RouteQuerySerializer, serialize_trip_plan, with_queries
 from routing.services import request_metrics
 from routing.services.planner import Vehicle, plan_trip
 
@@ -33,8 +33,8 @@ def plan_trip_body(start: str, finish: str) -> tuple[dict, str]:
     """
     key = plan_cache_key(start, finish)
     body = cache.get(key)
-    if body is not None:
-        return body, "hit"
+    if body is not None:  # maybe cached for another spelling, so echo this request's text
+        return with_queries(body, start, finish), "hit"
     body = serialize_trip_plan(plan_trip(start, finish))
     cache.set(key, body, settings.PLAN_CACHE_SECONDS)
     return body, "miss"

@@ -118,6 +118,23 @@ def test_the_cache_ignores_case_and_extra_spaces_in_place_names(client, http):
 
 
 @pytest.mark.usefixtures("stations")
+def test_a_cached_plan_echoes_this_request_s_own_place_names(client, http):
+    http.get(OSRM_CENSUS_URL, json=json.loads(OSRM_FIXTURE.read_text()))
+
+    plan(client, "Chicago, IL", "Los Angeles, CA")
+    body = plan(client, "chicago, il", "LOS ANGELES, CA").json()
+
+    assert body["meta"]["cache"] == "hit"
+    assert (body["start"]["query"], body["finish"]["query"]) == ("chicago, il", "LOS ANGELES, CA")
+    points = {
+        feature["properties"]["kind"]: feature["properties"]["query"]
+        for feature in body["map"]["geojson"]["features"]
+        if feature["properties"]["kind"] in ("start", "finish")
+    }
+    assert points == {"start": "chicago, il", "finish": "LOS ANGELES, CA"}
+
+
+@pytest.mark.usefixtures("stations")
 def test_a_different_trip_is_not_a_cache_hit(client, http):
     http.get(OSRM_REVERSED_URL, json=json.loads(OSRM_FIXTURE.read_text()))
 
