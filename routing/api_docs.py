@@ -245,6 +245,34 @@ def _response_examples(named_bodies: dict[str, dict]) -> list[OpenApiExample]:
     ]
 
 
+PLACES_PARAMETERS = [
+    OpenApiParameter(
+        "q",
+        str,
+        OpenApiParameter.QUERY,
+        required=True,
+        description='The start of a place name, optionally with ", ST" (at least 2 characters).',
+        examples=[
+            OpenApiExample("Partial name", value="chic"),
+            OpenApiExample("Name and state", value="springfield, mo"),
+        ],
+    )
+]
+PLACES_RESPONSES = {
+    200: OpenApiResponse(
+        description="Up to 8 places, best match first.",
+        examples=[
+            OpenApiExample(
+                "Suggestions",
+                value={"results": [{"label": "Chicago, IL", "name": "Chicago", "state": "IL"}]},
+            )
+        ],
+    ),
+    400: OpenApiResponse(
+        description="`q` is missing or shorter than 2 characters (INVALID_INPUT)."
+    ),
+}
+
 ROUTE_SUMMARY = "Plan the cheapest Fuel stops between two places in the USA"
 ROUTE_DESCRIPTION = (
     "One routing call (OSRM, up to 3 Routes) per uncached trip; repeats come from the cache "

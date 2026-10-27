@@ -1,0 +1,103 @@
+{# "Plan another trip": a GET form to the map page, with "City, ST" autocomplete from /api/places/. #}
+<form class="trip-form" method="get" action="{% url 'route-map' %}" autocomplete="off" aria-label="Plan a trip">
+  <div class="fields">
+    <div class="field">
+      <span class="dot start" aria-hidden="true"></span>
+      <label for="trip-start">From</label>
+      <input id="trip-start" name="start" value="{{ start }}" placeholder="City, ST" required
+             role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="trip-start-options">
+      <ul class="suggestions" id="trip-start-options" role="listbox" aria-label="Start suggestions" hidden></ul>
+    </div>
+    <div class="field">
+      <span class="dot finish" aria-hidden="true"></span>
+      <label for="trip-finish">To</label>
+      <input id="trip-finish" name="finish" value="{{ finish }}" placeholder="City, ST" required
+             role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="trip-finish-options">
+      <ul class="suggestions" id="trip-finish-options" role="listbox" aria-label="Finish suggestions" hidden></ul>
+    </div>
+  </div>
+  <button type="button" class="swap" aria-label="Swap start and finish" title="Swap">⇅</button>
+  <button type="submit" class="plan">Plan route</button>
+</form>
+<script>
+  (() => {
+    const endpoint = "{% url 'places' %}";
+    const answers = new Map();  // query -> suggestions, so retyping costs nothing
+    const form = document.currentScript.previousElementSibling;
+
+    form.querySelector(".swap").addEventListener("click", () => {
+      const [start, finish] = form.querySelectorAll("input");
+      [start.value, finish.value] = [finish.value, start.value];
+    });
+
+    for (const input of form.querySelectorAll("input[role=combobox]")) {
+      const list = document.getElementById(input.getAttribute("aria-controls"));
+      let options = [];
+      let active = -1;
+      let timer;
+      let pending;
+
+      const close = () => {
+        list.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        input.removeAttribute("aria-activedescendant");
+        active = -1;
+      };
+      const choose = (i) => {
+        input.value = options[i].label;
+        close();
+      };
+      const highlight = (i) => {
+        active = i;
+        [...list.children].forEach((li, j) => li.setAttribute("aria-selected", String(j === i)));
+        input.setAttribute("aria-activedescendant", list.children[i].id);
+        list.children[i].scrollIntoView({ block: "nearest" });
+      };
+      const show = (results) => {
+        options = results;
+        list.replaceChildren(...results.map((place, i) => {
+          const li = document.createElement("li");
+          li.id = list.id + "-" + i;
+          li.setAttribute("role", "option");
+          li.setAttribute("aria-selected", "false");
+          const state = document.createElement("span");
+          state.className = "state";
+          state.textContent = place.state;
+          li.append(place.name, state);
+          li.addEventListener("mousedown", (event) => { event.preventDefault(); choose(i); });
+          return li;
+        }));
+        list.hidden = !results.length;
+        input.setAttribute("aria-expanded", String(Boolean(results.length)));
+        active = -1;
+      };
+
+      async function lookUp() {
+        const query = input.value.trim();
+        if (query.length < 2 || /^[-\d]/.test(query)) return close();  // nothing to suggest for "lat,lng"
+        const key = query.toLowerCase();
+        if (answers.has(key)) return show(answers.get(key));
+        pending?.abort();
+        pending = new AbortController();
+        try {
+          const response = await fetch(endpoint + "?q=" + encodeURIComponent(query), { signal: pending.signal });
+          const results = response.ok ? (await response.json()).results : [];
+          answers.set(key, results);
+          if (document.activeElement === input) show(results);
+        } catch (error) {
+          if (error.name !== "AbortError") close();
+        }
+      }
+
+      input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(lookUp, 120); });
+      input.addEventListener("blur", close);
+      input.addEventListener("keydown", (event) => {
+        if (list.hidden || !options.length) return;
+        if (event.key === "ArrowDown") { event.preventDefault(); highlight((active + 1) % options.length); }
+        else if (event.key === "ArrowUp") { event.preventDefault(); highlight((active - 1 + options.length) % options.length); }
+        else if (event.key === "Enter" && active >= 0) { event.preventDefault(); choose(active); }
+        else if (event.key === "Escape") close();
+      });
+    }
+  })();
+</script>

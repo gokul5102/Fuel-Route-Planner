@@ -9,6 +9,8 @@ import csv
 import re
 import threading
 import unicodedata
+from bisect import bisect_left
+from dataclasses import dataclass
 from pathlib import Path
 
 from django.conf import settings
@@ -35,6 +37,25 @@ EVERYDAY_NAMES = {
 }
 
 
+# Autocomplete ranks incorporated cities first, then towns and villages, then the rest
+# (census-designated places and so on). Puerto Rico is outside the USA check, so it's not offered.
+CITY_RANK, TOWN_RANK, OTHER_RANK = 0, 1, 2
+TOWN_SUFFIX = re.compile(r"\s(town|village|borough|municipality)$", re.IGNORECASE)
+NOT_SUGGESTED = {"PR"}
+
+
+@dataclass(frozen=True)
+class Suggestion:
+    """A place offered while typing, e.g. Chicago, IL."""
+
+    name: str
+    state: str
+
+    @property
+    def label(self) -> str:
+        return f"{self.name}, {self.state}"
+
+
 def place_key(name: str) -> str:
     """Normalise a city name for matching: case, accents, spaces, punctuation, "Saint"."""
     key = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()  # ñ -> n
@@ -49,6 +70,9 @@ class PlaceIndex:
 
     def __init__(self) -> None:
         self._coords: dict[tuple[str, str], LatLon] = {}
+        # (key, rank, name, state), sorted by key on first use so a prefix is a bisect away
+        self._suggestions: list[tuple[str, int, str, str]] = []
+        self._sorted = True
 
     def __len__(self) -> int:
         return len(self._coords)
@@ -70,8 +94,43 @@ class PlaceIndex:
         for variant in variants:
             self._coords.setdefault((place_key(variant), state), (lat, lon))
 
+        if state not in NOT_SUGGESTED:
+            shown = (
+                everyday_name
+                or (consolidated and consolidated[1])
+                or PLACE_TYPE_SUFFIX.sub("", short_name)
+            )
+            if everyday_name or consolidated or short_name.lower().endswith(" city"):
+                rank = CITY_RANK
+            else:
+                rank = TOWN_RANK if TOWN_SUFFIX.search(short_name) else OTHER_RANK
+            self._suggestions.append((place_key(shown), rank, shown.strip(), state))
+            self._sorted = False
+
     def find(self, city: str, state: str) -> LatLon | None:
         return self._coords.get((place_key(city), state.strip().upper()))
+
+    def suggest(self, query: str, limit: int = 8) -> list[Suggestion]:
+        """Places whose name starts with `query`; "springfield, mo" also narrows by state.
+
+        An exact name comes first, then cities, towns and other places, alphabetically.
+        """
+        name, _, state = query.partition(",")
+        key, state = place_key(name), state.strip().upper()
+        if not key:
+            return []
+        if not self._sorted:
+            self._suggestions.sort()
+            self._sorted = True
+        matches = []
+        for entry in self._suggestions[bisect_left(self._suggestions, (key,)) :]:
+            if not entry[0].startswith(key):
+                break
+            if entry[3].startswith(state):
+                matches.append(entry)
+        matches.sort(key=lambda e: (e[0] != key, e[1], e[2], e[3]))
+        suggestions = list(dict.fromkeys(Suggestion(name=e[2], state=e[3]) for e in matches))
+        return suggestions[:limit]
 
     @classmethod
     def from_csv(cls, path: Path) -> "PlaceIndex":

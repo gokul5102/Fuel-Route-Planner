@@ -13,15 +13,23 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from routing.api_docs import (
+    PLACES_PARAMETERS,
+    PLACES_RESPONSES,
     ROUTE_DESCRIPTION,
     ROUTE_QUERY_PARAMETERS,
     ROUTE_RESPONSES,
     ROUTE_SUMMARY,
 )
 from routing.errors import describe_error
-from routing.serializers import RouteQuerySerializer, serialize_trip_plan, with_queries
+from routing.serializers import (
+    PlaceQuerySerializer,
+    RouteQuerySerializer,
+    serialize_trip_plan,
+    with_queries,
+)
 from routing.services import request_metrics
 from routing.services.locations import normalise_query
+from routing.services.places import get_place_index
 from routing.services.planner import Vehicle, plan_trip
 
 
@@ -86,6 +94,28 @@ class RouteView(APIView):
         url = map_url(request, start, finish)
         meta = request_metrics.current().meta(cache=cache_status)
         return Response({**body, "map": {**body["map"], "url": url}, "meta": meta})
+
+
+class PlaceSuggestionsView(APIView):
+    """Autocomplete for "City, ST" from the local Census places: no external call."""
+
+    authentication_classes = []
+    permission_classes = []
+
+    @extend_schema(
+        summary="Suggest US places for a partly typed name",
+        parameters=PLACES_PARAMETERS,
+        responses=PLACES_RESPONSES,
+    )
+    def get(self, request):
+        query = PlaceQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        suggestions = get_place_index().suggest(query.validated_data["q"])
+        results = [{"label": s.label, "name": s.name, "state": s.state} for s in suggestions]
+        response = Response({"results": results})
+        # The places file only changes on deploy.
+        response["Cache-Control"] = "public, max-age=86400"
+        return response
 
 
 @require_GET

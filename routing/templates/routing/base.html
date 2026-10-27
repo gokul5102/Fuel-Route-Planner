@@ -11,34 +11,59 @@
       --panel: #ffffff;
       --ink: #0f172a;
       --muted: #64748b;
-      --line: #e2e8f0;
+      --faint: #94a3b8;
+      --line: #e5e9f0;
+      --hover: #f5f7fb;
       --accent: #1d4ed8;
-      --accent-soft: #e8efff;
+      --accent-soft: #eef3ff;
       --start: #16a34a;
       --finish: #dc2626;
       --alternative: #94a3b8;
       --danger-soft: #fef2f2;
-      --radius: 10px;
+      --radius: 12px;
       --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
-    body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font); }
-    h1, h2, p, ol, dl, dd { margin: 0; }
+    body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font); -webkit-font-smoothing: antialiased; }
+    h1, h2, p, ol, ul, dl, dd { margin: 0; }
+    ul, ol { padding: 0; list-style: none; }
     .num { font-variant-numeric: tabular-nums; }
-    .eyebrow { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+    .eyebrow { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; }
 
-    /* "Plan another trip": a plain GET form to this same page. */
-    .trip-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; }
-    .trip-form input {
-      min-width: 0; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px;
-      font: inherit; color: var(--ink); background: #fff;
+    /* ---- Trip form: From / To with autocomplete, a swap button and Plan. */
+    .trip-form { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+    .trip-form .fields { position: relative; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+    .trip-form .fields::before {  /* the dotted line joining the From and To dots */
+      content: ""; position: absolute; left: 17px; top: 26px; bottom: 26px; border-left: 2px dotted var(--faint);
     }
-    .trip-form button {
-      padding: 7px 12px; border: 0; border-radius: 7px; background: var(--accent); color: #fff;
-      font: 600 13px var(--font); cursor: pointer;
-    }
-    .trip-form input:focus-visible, .trip-form button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .trip-form .field { position: relative; display: grid; grid-template-columns: 22px 36px 1fr; align-items: center;
+                        padding: 0 10px 0 12px; height: 44px; }
+    .trip-form .field + .field { border-top: 1px solid var(--line); }
+    .trip-form .dot { width: 10px; height: 10px; border-radius: 50%; position: relative; z-index: 1; }
+    .trip-form .dot.start { background: var(--start); }
+    .trip-form .dot.finish { background: var(--finish); }
+    .trip-form label { color: var(--muted); font-size: 12px; }
+    .trip-form input { min-width: 0; height: 100%; border: 0; padding: 0; background: none; font: 500 14px var(--font); color: var(--ink); outline: none; }
+    .trip-form input::placeholder { color: var(--faint); font-weight: 400; }
+    .trip-form .field:focus-within { background: var(--accent-soft); }
+    .trip-form .field:first-child:focus-within { border-radius: var(--radius) var(--radius) 0 0; }
+    .trip-form .field:last-child:focus-within { border-radius: 0 0 var(--radius) var(--radius); }
+    .trip-form .swap { align-self: center; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 50%;
+                       background: #fff; color: var(--muted); font-size: 16px; cursor: pointer; }
+    .trip-form .swap:hover { color: var(--ink); background: var(--hover); }
+    .trip-form .plan { grid-column: 1 / -1; height: 40px; border: 0; border-radius: 10px; background: var(--accent);
+                       color: #fff; font: 600 14px var(--font); cursor: pointer; }
+    .trip-form .plan:hover { background: #1e40af; }
+    .trip-form button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .suggestions { position: absolute; left: 8px; right: 8px; top: calc(100% + 4px); z-index: 1000; padding: 4px;
+                   background: #fff; border: 1px solid var(--line); border-radius: 10px;
+                   box-shadow: 0 12px 32px rgba(15, 23, 42, .14); max-height: 280px; overflow-y: auto; }
+    .suggestions li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
+    .suggestions li[aria-selected="true"], .suggestions li:hover { background: var(--accent-soft); }
+    .suggestions .state { color: var(--muted); font: 600 12px var(--mono); }
   </style>
   {% block style %}{% endblock %}
 </head>

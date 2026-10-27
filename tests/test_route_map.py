@@ -135,8 +135,11 @@ def test_the_map_page_draws_the_same_plan_with_leaflet(client, stations, osrm):
     assert "leaflet@1.9.4" in html
     # Tile servers block browser requests without a Referer; Django's default same-origin
     # Referrer-Policy strips it, so the tile layer must ask for one explicitly.
-    assert "basemaps.cartocdn.com" in html
+    assert "tile.openstreetmap.org" in html
     assert 'referrerPolicy: "strict-origin-when-cross-origin"' in html
+    # the trip form suggests "City, ST" from the local places endpoint
+    assert 'role="combobox"' in html
+    assert '"/api/places/"' in html
     shown = embedded_plan(html)
     assert shown["total_fuel_cost"] == 717.34
     assert shown["route"] == {"distance_miles": 2018.03, "duration_hours": 35.36}

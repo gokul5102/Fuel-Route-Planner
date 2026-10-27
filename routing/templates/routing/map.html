@@ -11,69 +11,71 @@
 
 {% block style %}
 <style>
-  .layout { display: grid; grid-template-columns: 400px 1fr; height: 100dvh; }
-  .panel { display: flex; flex-direction: column; gap: 18px; overflow-y: auto; padding: 20px;
-           background: var(--panel); border-right: 1px solid var(--line); }
+  .layout { display: grid; grid-template-columns: 380px 1fr; height: 100dvh; }
+  .panel { display: flex; flex-direction: column; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); }
+  .panel > * { padding: 18px 20px; }
+  .panel > * + * { border-top: 1px solid var(--line); }
   #map { height: 100%; min-height: 0; background: #e5e7eb; }
+  /* Muted OpenStreetMap tiles, so the Route and stops stand out. Only the tiles are filtered. */
+  #map .leaflet-tile-pane { filter: grayscale(.9) contrast(.9) brightness(1.04); }
 
-  .trip h1 { font-size: 18px; line-height: 1.3; margin-top: 4px; }
-  .trip h1 .arrow { color: var(--muted); font-weight: 400; padding: 0 2px; }
+  .summary .total { margin: 2px 0 4px; font-size: 36px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+  .summary .facts { color: var(--muted); }
+  .summary .facts span + span::before { content: "·"; padding: 0 6px; color: var(--faint); }
 
-  .hero { padding: 16px; border-radius: var(--radius); background: var(--accent-soft); }
-  .hero .value { font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; margin: 2px 0; }
-  .hero .sub { color: #334155; }
+  .section h2 { margin-bottom: 10px; }
 
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .stats div { padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); }
-  .stats dt { color: var(--muted); font-size: 12px; }
-  .stats dd { font-size: 16px; font-weight: 600; }
-
-  .section h2 { margin-bottom: 8px; }
-
-  .routes { width: 100%; border-collapse: collapse; }
-  .routes th { color: var(--muted); font-size: 12px; font-weight: 500; text-align: right; padding: 0 0 6px; }
-  .routes th:first-child, .routes td:first-child { text-align: left; }
-  .routes td { padding: 8px 0; border-top: 1px solid var(--line); text-align: right; }
-  .routes tr[data-route] { cursor: pointer; }
-  .routes tr[data-route]:hover td { background: #f8fafc; }
-  .swatch { display: inline-block; width: 18px; height: 0; margin-right: 6px; vertical-align: middle;
-            border-top: 4px solid var(--accent); border-radius: 2px; }
+  .routes { display: flex; flex-direction: column; gap: 6px; }
+  .routes button { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; width: 100%;
+                   padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: none;
+                   font: inherit; color: inherit; text-align: left; cursor: pointer; }
+  .routes button:hover { background: var(--hover); }
+  .routes .chosen { border-color: #c7d6fb; background: var(--accent-soft); }
+  .routes .meta { color: var(--muted); font-size: 12px; }
+  .routes .price { font-weight: 600; text-align: right; }
+  .routes .delta { color: var(--finish); font-size: 12px; font-weight: 500; text-align: right; }
+  .swatch { width: 20px; height: 0; border-top: 4px solid var(--accent); border-radius: 2px; }
   .swatch.alternative { border-top: 3px dashed var(--alternative); }
-  .delta { display: block; color: var(--muted); font-size: 12px; }
-  .badge { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: #fff;
-           font-size: 11px; font-weight: 600; vertical-align: 1px; }
 
-  .stops { list-style: none; padding: 0; display: flex; flex-direction: column; }
-  .stops button { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: start;
-                  width: 100%; padding: 9px 6px; border: 0; border-top: 1px solid var(--line);
-                  background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
-  .stops li:first-child button { border-top: 0; }
-  .stops button:hover, .stops button.active { background: var(--accent-soft); border-radius: 8px; }
-  .stops button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
-  .stops .name { font-weight: 600; font-size: 13px; }
-  .stops .where, .stops .detail { color: var(--muted); font-size: 12px; }
+  /* Fuel stops as a timeline: numbered dots on a line, cost on the right. */
+  .stops { position: relative; }
+  .stops::before { content: ""; position: absolute; left: 17px; top: 18px; bottom: 18px; border-left: 2px solid var(--line); }
+  .stops button { position: relative; display: grid; grid-template-columns: 24px 1fr auto; gap: 12px; align-items: center;
+                  width: 100%; padding: 8px 6px; border: 0; border-radius: 10px; background: none;
+                  font: inherit; color: inherit; text-align: left; cursor: pointer; }
+  .stops button:hover, .stops button.active { background: var(--accent-soft); }
+  .stops button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .stops .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stops .detail { color: var(--muted); font-size: 12px; }
   .stops .cost { font-weight: 600; text-align: right; }
+  .stops .gal { color: var(--muted); font-size: 12px; text-align: right; }
+  .tag { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: #f1f5f9; color: var(--muted);
+         font-size: 11px; font-weight: 500; vertical-align: 1px; }
   .empty { color: var(--muted); }
 
   .stop-icon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
                background: var(--accent); color: #fff; border: 2px solid #fff; font: 700 12px var(--font);
                box-shadow: 0 1px 4px rgba(15, 23, 42, .45); transition: transform .12s; }
-  .stop-icon.list { width: 24px; height: 24px; box-shadow: none; border: 0; font-size: 11px; }
+  .stop-icon.list { width: 24px; height: 24px; font-size: 11px; box-shadow: 0 0 0 3px var(--panel); border: 0; }
   .stop-icon.active { transform: scale(1.35); background: #0b2a8a; }
 
-  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 12px; }
-  .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
-  .note { color: var(--muted); font-size: 12px; }
+  details.about { color: var(--muted); font-size: 12px; }
+  details.about summary { cursor: pointer; font-weight: 600; color: var(--ink); font-size: 13px; }
+  details.about ul { margin-top: 8px; padding-left: 16px; list-style: disc; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 10px; border-radius: 8px;
+            background: rgba(255, 255, 255, .92); box-shadow: 0 1px 4px rgba(15, 23, 42, .2); color: #334155; font: 12px var(--font); }
+  .legend > span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend .pin { width: 10px; height: 10px; border-radius: 50%; }
 
   .popup .title { font-weight: 600; }
   .popup .muted { color: var(--muted); }
 
   @media (max-width: 760px) {
-    .layout { grid-template-columns: 1fr; grid-template-rows: 50dvh 1fr; }
+    .layout { grid-template-columns: 1fr; grid-template-rows: 45dvh 1fr; }
     #map { order: -1; }
-    .panel { border-right: 0; border-top: 1px solid var(--line); padding: 16px; }
-    .trip-form { grid-template-columns: 1fr 1fr; }
-    .trip-form button { grid-column: span 2; }
+    .panel { border-right: 0; border-top: 1px solid var(--line); }
+    .panel > * { padding: 16px; }
   }
 </style>
 {% endblock %}
@@ -81,51 +83,28 @@
 {% block body %}
 <div class="layout">
   <aside class="panel" aria-label="Fuel plan">
-    <form class="trip-form" method="get" aria-label="Plan another trip">
-      <input name="start" value="{{ start }}" aria-label="Start" required>
-      <input name="finish" value="{{ finish }}" aria-label="Finish" required>
-      <button type="submit">Plan</button>
-    </form>
+    <div>{% include "routing/_trip_form.html" %}</div>
 
-    <header class="trip">
-      <p class="eyebrow">Cheapest fuel plan</p>
-      <h1 id="trip-title"></h1>
-    </header>
-
-    <section class="hero" aria-label="Total fuel cost">
-      <p class="eyebrow">Total fuel cost</p>
-      <p class="value num" id="total-cost"></p>
-      <p class="sub num" id="total-sub"></p>
+    <section class="summary" aria-label="Total fuel cost">
+      <p class="eyebrow">Cheapest fuel cost</p>
+      <p class="total num" id="total-cost"></p>
+      <p class="facts num" id="facts"></p>
     </section>
-
-    <dl class="stats num">
-      <div><dt>Distance</dt><dd id="distance"></dd></div>
-      <div><dt>Drive time</dt><dd id="duration"></dd></div>
-      <div><dt>Fuel stops</dt><dd id="stop-count"></dd></div>
-    </dl>
 
     <section class="section" id="routes-section">
       <h2 class="eyebrow">Routes compared</h2>
-      <table class="routes num">
-        <thead><tr><th>Route</th><th>Distance</th><th>Time</th><th>Fuel</th></tr></thead>
-        <tbody id="routes"></tbody>
-      </table>
+      <div class="routes num" id="routes"></div>
     </section>
 
     <section class="section">
-      <h2 class="eyebrow">Fuel stops</h2>
+      <h2 class="eyebrow" id="stops-heading">Fuel stops</h2>
       <ol class="stops" id="stops"></ol>
     </section>
 
-    <footer class="section">
-      <div class="legend">
-        <span><span class="swatch"></span>Chosen Route</span>
-        <span><span class="swatch alternative"></span>Alternative</span>
-        <span><span class="dot" style="background: var(--start)"></span>Start</span>
-        <span><span class="dot" style="background: var(--finish)"></span>Finish</span>
-      </div>
-      <p class="note" id="assumptions"></p>
-    </footer>
+    <details class="about">
+      <summary>How this plan was made</summary>
+      <ul id="assumptions"></ul>
+    </details>
   </aside>
   <div id="map" role="region" aria-label="Map of the Route and Fuel stops"></div>
 </div>
@@ -136,15 +115,28 @@
   const plan = JSON.parse(document.getElementById("plan").textContent);
   const features = plan.map.geojson.features;
   const ofKind = (kind) => features.filter((f) => f.properties.kind === kind);
+  const TOP_UP_GALLONS = 2.5;  // smaller purchases only bridge to a cheaper Station just ahead
 
   const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
   const oneDecimal = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
-  const miles = (value) => oneDecimal.format(value) + " mi";
+  const wholeMiles = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+  const miles = (value) => wholeMiles.format(value) + " mi";
   const pricePerGallon = (value) => "$" + value.toFixed(3) + "/gal";
   const gallons = (value) => oneDecimal.format(value) + " gal";
   function hours(value) {
     const total = Math.round(value * 60);
-    return Math.floor(total / 60) + " h " + String(total % 60).padStart(2, "0") + " min";
+    return Math.floor(total / 60) + "h " + String(total % 60).padStart(2, "0") + "m";
+  }
+  // Station names are upper case in the price file: "PILOT TRAVEL CENTER #123" -> "Pilot Travel Center #123".
+  // Short words without vowels (BP, LLC) and two-letter words (TA) stay as they are.
+  const SMALL_WORDS = new Set(["of", "and", "the", "at", "in", "on", "by", "for", "to"]);
+  function titleCase(name) {
+    return name.split(" ").map((word, i) => {
+      const lower = word.toLowerCase();
+      if (i > 0 && SMALL_WORDS.has(lower)) return lower;
+      if (word.length <= 2 || !/[aeiouy]/i.test(word)) return word;
+      return lower.replace(/(^|[-/(&'])([a-z])/g, (_, before, letter) => before + letter.toUpperCase());
+    }).join(" ");
   }
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -152,33 +144,35 @@
     if (text !== undefined) node.textContent = text;
     return node;
   }
-  const setText = (id, text) => { document.getElementById(id).textContent = text; };
 
-  // ---- Summary panel
-  const title = document.getElementById("trip-title");
-  title.append(plan.start.query, element("span", "arrow", " → "), plan.finish.query);
-  setText("total-cost", usd.format(plan.total_fuel_cost));
+  // ---- Summary: one big number, one line of facts.
+  const stopCount = plan.fuel_stops.length;
   const average = plan.total_gallons ? plan.total_fuel_cost / plan.total_gallons : 0;
-  setText("total-sub", gallons(plan.total_gallons) + " at an average of " + pricePerGallon(average));
-  setText("distance", miles(plan.route.distance_miles));
-  setText("duration", hours(plan.route.duration_hours));
-  setText("stop-count", String(plan.fuel_stops.length));
+  document.getElementById("total-cost").textContent = usd.format(plan.total_fuel_cost);
+  document.getElementById("facts").append(...[
+    miles(plan.route.distance_miles),
+    hours(plan.route.duration_hours),
+    stopCount + (stopCount === 1 ? " stop" : " stops"),
+    gallons(plan.total_gallons),
+    "avg " + pricePerGallon(average),
+  ].map((fact) => element("span", "", fact)));
   const a = plan.assumptions;
-  setText("assumptions",
-    a.range_miles + "-mile Range at " + a.mpg + " MPG, starting with an empty tank. Stations within " +
-    a.corridor_miles + " miles of the Route count as on it; Station locations are city-level.");
+  document.getElementById("assumptions").append(...[
+    a.range_miles + "-mile Range at " + a.mpg + " MPG, starting with an empty tank.",
+    "Stations within " + a.corridor_miles + " miles of the Route count as on it; Station locations are city-level.",
+    "Each stop buys just enough to reach a cheaper Station, or fills up when none is in Range — so some stops are small top-ups.",
+    "Planned on " + (plan.alternatives.length + 1) + " Route(s) from one OSRM call; the cheapest is shown.",
+  ].map((text) => element("li", "", text)));
 
   // ---- Map. Leaflet needs a view before vector layers are added, so fit the chosen Route first.
   const chosenRoute = ofKind("route").find((route) => route.properties.chosen);
   const map = L.map("map", { zoomSnap: 0.25 }).fitBounds(L.geoJSON(chosenRoute).getBounds(), { padding: [32, 32] });
-  // CARTO's light basemap keeps the Route and stops readable. Tile servers require a Referer,
-  // which Django's same-origin Referrer-Policy would otherwise strip.
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-    subdomains: "abcd",
+  // OpenStreetMap's tile servers block requests without a Referer, and Django's default
+  // same-origin Referrer-Policy strips it, so the tile layer asks for one explicitly.
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     referrerPolicy: "strict-origin-when-cross-origin",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
-                 '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
 
   // Alternatives first (grey, dashed, underneath), then the chosen Route (blue, on top).
@@ -187,7 +181,7 @@
     const chosen = route.properties.chosen;
     const layer = L.geoJSON(route, {
       style: chosen ? { color: "#1d4ed8", weight: 5, opacity: 0.9 }
-                    : { color: "#94a3b8", weight: 4, opacity: 0.8, dashArray: "7 7" },
+                    : { color: "#64748b", weight: 4, opacity: 0.7, dashArray: "7 7" },
     }).addTo(map);
     routeLayers.push({ route, layer });
   }
@@ -201,13 +195,27 @@
     }
   }
 
-  // ---- Fuel stops: one marker and one list row each, linked both ways.
+  // The legend sits on the map, where it is read.
+  const legend = L.control({ position: "bottomleft" });
+  legend.onAdd = () => {
+    const box = element("div", "legend");
+    const item = (marker, text) => { const span = element("span"); span.append(marker, text); return span; };
+    const pin = (colour) => { const dot = element("span", "pin"); dot.style.background = colour; return dot; };
+    box.append(item(element("span", "swatch"), "Chosen Route"));
+    if (plan.alternatives.length) box.append(item(element("span", "swatch alternative"), "Alternative"));
+    box.append(item(pin("#16a34a"), "Start"), item(pin("#dc2626"), "Finish"), item(pin("#1d4ed8"), "Fuel stop"));
+    return box;
+  };
+  legend.addTo(map);
+
+  // ---- Fuel stops: one marker and one timeline row each, linked both ways.
   function popupContent(stop) {
     const box = element("div", "popup");
     box.append(
-      element("div", "title", stop.number + ". " + stop.name),
-      element("div", "muted", stop.city + ", " + stop.state + " · mile " + oneDecimal.format(stop.mile_marker)),
-      element("div", "num", gallons(stop.gallons) + " at " + pricePerGallon(stop.price_per_gallon) + " = " + usd.format(stop.cost)),
+      element("div", "title", stop.number + ". " + titleCase(stop.name)),
+      element("div", "muted", stop.address + ", " + stop.city + ", " + stop.state),
+      element("div", "muted", "Mile " + wholeMiles.format(stop.mile_marker)),
+      element("div", "num", gallons(stop.gallons) + " × " + pricePerGallon(stop.price_per_gallon) + " = " + usd.format(stop.cost)),
     );
     return box;
   }
@@ -237,23 +245,23 @@
     const icon = element("div", "stop-icon", String(stop.number));
     const marker = L.marker([lat, lon], {
       icon: L.divIcon({ html: icon, className: "", iconSize: [26, 26] }),
-      title: "Fuel stop " + stop.number + ": " + stop.name,
+      title: "Fuel stop " + stop.number + ": " + titleCase(stop.name),
       zIndexOffset: 1000 - stop.number,
     }).bindPopup(popupContent(stop)).addTo(map);
     marker.on("click", () => activate(stop.number));
 
+    const name = element("div", "name", titleCase(stop.name));
+    name.title = stop.name;
+    if (stop.gallons < TOP_UP_GALLONS) name.append(element("span", "tag", "top-up"));
+    const where = element("div");
+    where.style.minWidth = "0";
+    where.append(name, element("div", "detail num",
+      "Mile " + wholeMiles.format(stop.mile_marker) + " · " + stop.city + ", " + stop.state + " · " + pricePerGallon(stop.price_per_gallon)));
+    const cost = element("div");
+    cost.append(element("div", "cost num", usd.format(stop.cost)), element("div", "gal num", gallons(stop.gallons)));
+
     const button = element("button");
     button.type = "button";
-    const where = element("div");
-    where.append(
-      element("div", "name", stop.name),
-      element("div", "where", stop.city + ", " + stop.state + " · mile " + oneDecimal.format(stop.mile_marker)),
-    );
-    const cost = element("div");
-    cost.append(
-      element("div", "cost num", usd.format(stop.cost)),
-      element("div", "detail num", gallons(stop.gallons) + " @ " + pricePerGallon(stop.price_per_gallon)),
-    );
     button.append(element("span", "stop-icon list", String(stop.number)), where, cost);
     button.addEventListener("click", () => activate(stop.number, { pan: true }));
     const item = element("li");
@@ -261,40 +269,33 @@
     list.append(item);
     rows.set(stop.number, { row: button, icon, marker });
   }
+  document.getElementById("stops-heading").textContent = "Fuel stops · " + stopCount;
   if (!rows.size) list.append(element("li", "empty", "No Fuel stops needed."));
 
-  // ---- Routes compared: the chosen Route, then each alternative with its cost difference.
-  const routesBody = document.getElementById("routes");
-  function routeRow(label, swatchClass, summary, chosen) {
-    const row = element("tr");
-    const name = element("td");
-    name.append(element("span", "swatch " + swatchClass), label);
-    if (chosen) name.append(element("span", "badge", "cheapest"));
-    const fuel = element("td");
+  // ---- Routes compared: one row per Route; clicking a row fits the map to it.
+  const routesBox = document.getElementById("routes");
+  const summaries = [{ ...plan.route, total_fuel_cost: plan.total_fuel_cost }, ...plan.alternatives];
+  summaries.forEach((summary, i) => {
+    const chosen = i === 0;
+    const row = element("button", chosen ? "chosen" : "");
+    row.type = "button";
+    const label = element("div");
+    label.append(element("div", "", chosen ? "Cheapest Route" : "Alternative " + i),
+                 element("div", "meta", miles(summary.distance_miles) + " · " + hours(summary.duration_hours)));
+    const fuel = element("div");
     if (summary.total_fuel_cost === null) {
-      fuel.append(element("span", "delta", "can't be fuelled"));
+      fuel.append(element("div", "delta", "can't be fuelled"));
     } else {
-      fuel.append(usd.format(summary.total_fuel_cost));
-      if (!chosen) {
-        const extra = summary.total_fuel_cost - plan.total_fuel_cost;
-        fuel.append(element("span", "delta", "+" + usd.format(extra)));
-      }
+      fuel.append(element("div", "price", usd.format(summary.total_fuel_cost)));
+      if (!chosen) fuel.append(element("div", "delta", "+" + usd.format(summary.total_fuel_cost - plan.total_fuel_cost)));
     }
-    row.append(name, element("td", "", miles(summary.distance_miles)), element("td", "", hours(summary.duration_hours)), fuel);
-    return row;
-  }
-  routesBody.append(routeRow("Chosen", "", { ...plan.route, total_fuel_cost: plan.total_fuel_cost }, true));
-  plan.alternatives.forEach((summary, i) => routesBody.append(routeRow("Alternative " + (i + 1), "alternative", summary, false)));
-  if (!plan.alternatives.length) document.getElementById("routes-section").hidden = true;
-  // Clicking a row fits the map to that Route (matched by its distance).
-  const summaries = [plan.route, ...plan.alternatives];
-  routesBody.querySelectorAll("tr").forEach((row, i) => {
-    const entry = routeLayers.find((r) => r.route.properties.chosen === (i === 0) &&
-                                          r.route.properties.distance_miles === summaries[i].distance_miles);
-    if (!entry) return;
-    row.dataset.route = String(i);
-    row.addEventListener("click", () => map.flyToBounds(entry.layer.getBounds(), { padding: [32, 32], duration: 0.6 }));
+    row.append(element("span", "swatch" + (chosen ? "" : " alternative")), label, fuel);
+    const entry = routeLayers.find((r) => r.route.properties.chosen === chosen &&
+                                          r.route.properties.distance_miles === summary.distance_miles);
+    if (entry) row.addEventListener("click", () => map.flyToBounds(entry.layer.getBounds(), { padding: [32, 32], duration: 0.6 }));
+    routesBox.append(row);
   });
+  if (!plan.alternatives.length) document.getElementById("routes-section").hidden = true;
 
   // The grid can resize the map container (e.g. rotating a phone).
   new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById("map"));

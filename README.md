@@ -49,6 +49,7 @@ Then try one of these:
 |---|---|
 | `GET /api/route/?start=…&finish=…` | the plan as JSON |
 | `GET /api/route/map/?start=…&finish=…` | the same plan on a Leaflet map (HTML) |
+| `GET /api/places/?q=…` | "City, ST" suggestions from the local Census file (powers the map page's autocomplete; 0 external calls) |
 | `GET /api/docs/` | Swagger UI |
 | `GET /api/schema/` | OpenAPI 3 schema |
 
@@ -254,7 +255,7 @@ Other measurements:
 |---|---|---|
 | [OSRM demo server](https://router.project-osrm.org) | routing, 1 call per uncached request | at most 1 request/s, non-commercial use, no uptime guarantee |
 | [Nominatim](https://nominatim.openstreetmap.org) | free-text addresses only | at most 1 request/s, an identifying User-Agent, cache the results ([policy](https://operations.osmfoundation.org/policies/nominatim/)) |
-| CARTO light basemap (OpenStreetMap data) and Leaflet (unpkg) | the map page, loaded by the browser | no API key; tiles need a Referer, which the tile layer sends explicitly |
+| OpenStreetMap tiles and Leaflet (unpkg) | the map page, loaded by the browser | no API key; OSM blocks tile requests without a Referer, so the tile layer sends one explicitly |
 | US Census Gazetteer 2024 | Station and city coordinates, offline only | public domain |
 
 **Timeouts.** Every OSRM and Nominatim call gets 10 seconds in total, from connecting to

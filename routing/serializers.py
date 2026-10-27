@@ -8,6 +8,12 @@ from routing.services.planner import PlannedStop, RouteOption, TripPlan, Vehicle
 from routing.services.route_map import trip_geojson
 
 
+class PlaceQuerySerializer(serializers.Serializer):
+    """`q` is the start of a place name, optionally followed by ", ST"."""
+
+    q = serializers.CharField(min_length=2, max_length=100)
+
+
 class RouteQuerySerializer(serializers.Serializer):
     """`start` and `finish` are required and non-blank (surrounding spaces are trimmed).
 
