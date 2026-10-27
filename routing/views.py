@@ -3,7 +3,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from routing.serializers import serialize_trip_plan
+from routing.serializers import RouteQuerySerializer, serialize_trip_plan
 from routing.services.planner import plan_trip
 
 
@@ -21,5 +21,7 @@ class RouteView(APIView):
         responses=OpenApiTypes.OBJECT,
     )
     def get(self, request):
-        trip = plan_trip(request.query_params["start"], request.query_params["finish"])
+        query = RouteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        trip = plan_trip(query.validated_data["start"], query.validated_data["finish"])
         return Response(serialize_trip_plan(trip))

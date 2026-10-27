@@ -1,7 +1,34 @@
-"""Turn a TripPlan into the JSON body of GET /api/route/."""
+"""The query parameters and the JSON body of GET /api/route/."""
 
-from routing.services.locations import ResolvedLocation
+from rest_framework import serializers
+
+from routing.services.locations import COORDINATES, ResolvedLocation
 from routing.services.planner import PlannedStop, TripPlan, Vehicle
+
+
+class RouteQuerySerializer(serializers.Serializer):
+    """`start` and `finish` are required and non-blank (surrounding spaces are trimmed).
+
+    A value written as "lat,lng" must be a real coordinate pair.
+    """
+
+    start = serializers.CharField(max_length=200)
+    finish = serializers.CharField(max_length=200)
+
+    def validate_start(self, value: str) -> str:
+        return _valid_coordinates_if_given(value)
+
+    def validate_finish(self, value: str) -> str:
+        return _valid_coordinates_if_given(value)
+
+
+def _valid_coordinates_if_given(value: str) -> str:
+    match = COORDINATES.match(value)
+    if match and not (-90 <= float(match[1]) <= 90 and -180 <= float(match[2]) <= 180):
+        raise serializers.ValidationError(
+            "Coordinates must be latitude -90..90 and longitude -180..180."
+        )
+    return value
 
 
 def serialize_trip_plan(trip: TripPlan) -> dict:

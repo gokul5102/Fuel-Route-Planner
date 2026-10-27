@@ -87,6 +87,7 @@ STATIC_URL = "static/"
 
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "routing.errors.api_exception_handler",
 }
 
 SPECTACULAR_SETTINGS = {
