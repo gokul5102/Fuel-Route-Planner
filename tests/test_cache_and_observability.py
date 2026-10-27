@@ -74,3 +74,15 @@ def test_the_map_page_carries_the_same_headers(client, http):
     assert response.status_code == 200
     assert response.headers["X-External-Calls"] == "1"
     assert response_time_ms(response) >= 0
+
+
+@pytest.mark.usefixtures("stations")
+def test_a_fresh_plan_reports_a_cache_miss_its_calls_and_each_stage_time(client, http):
+    meta = plan(client).json()["meta"]
+
+    assert meta["cache"] == "miss"
+    assert meta["external_calls"] == 1
+    timings = meta["timings_ms"]
+    assert set(timings) == {"geocode", "routing", "corridor", "optimize", "total"}
+    assert all(ms >= 0 for ms in timings.values())
+    assert timings["total"] >= timings["routing"] + timings["corridor"] + timings["optimize"]

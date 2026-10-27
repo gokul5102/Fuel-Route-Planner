@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from routing.errors import describe_error
 from routing.serializers import RouteQuerySerializer, serialize_trip_plan
+from routing.services import request_metrics
 from routing.services.planner import plan_trip
 
 
@@ -49,7 +50,8 @@ class RouteView(APIView):
         start, finish = query.validated_data["start"], query.validated_data["finish"]
         body = plan_trip_body(start, finish)
         url = map_url(request, start, finish)
-        return Response({**body, "map": {**body["map"], "url": url}})
+        meta = request_metrics.current().meta(cache="miss")
+        return Response({**body, "map": {**body["map"], "url": url}, "meta": meta})
 
 
 @require_GET

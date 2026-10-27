@@ -12,6 +12,7 @@ from routing.services.corridor import stations_in_corridor
 from routing.services.locations import ResolvedLocation, check_distinct, resolve_location
 from routing.services.optimizer import CandidateStation, FuelPlanError, plan_fuel_stops
 from routing.services.osrm import RoutedPath, fetch_routes
+from routing.services.request_metrics import stage
 from routing.services.station_index import IndexedStation, StationIndex, get_station_index
 
 TIE_CENTS = Decimal("0.01")  # Routes whose fuel costs differ by at most this are a tie
@@ -80,10 +81,12 @@ class TripPlan:
 
 def plan_trip(start_query: str, finish_query: str) -> TripPlan:
     vehicle = Vehicle.from_settings()
-    start = resolve_location(start_query)
-    finish = resolve_location(finish_query)
+    with stage("geocode"):
+        start = resolve_location(start_query)
+        finish = resolve_location(finish_query)
     check_distinct(start, finish)
-    routes = fetch_routes((start.lat, start.lon), (finish.lat, finish.lon))
+    with stage("routing"):
+        routes = fetch_routes((start.lat, start.lon), (finish.lat, finish.lon))
     plan, alternatives = choose_cheapest_route(routes, get_station_index(), vehicle)
     return TripPlan(start, finish, plan, vehicle, alternatives)
 
@@ -122,20 +125,22 @@ def plan_route(route: RoutedPath, index: StationIndex, vehicle: Vehicle) -> Rout
 
     Raises the optimizer's FuelPlanError when the Route cannot be fuelled.
     """
-    on_route = stations_in_corridor(
-        route.points,
-        index,
-        corridor_miles=vehicle.corridor_miles,
-        route_miles=route.distance_miles,
-    )
+    with stage("corridor"):
+        on_route = stations_in_corridor(
+            route.points,
+            index,
+            corridor_miles=vehicle.corridor_miles,
+            route_miles=route.distance_miles,
+        )
     by_id = {match.station.opis_id: match.station for match in on_route}
-    fuel_plan = plan_fuel_stops(
-        route.distance_miles,
-        [CandidateStation(m.station.opis_id, m.mile_marker, m.station.price) for m in on_route],
-        range_miles=vehicle.range_miles,
-        mpg=vehicle.mpg,
-        reserve_miles=vehicle.reserve_miles,
-    )
+    with stage("optimize"):
+        fuel_plan = plan_fuel_stops(
+            route.distance_miles,
+            [CandidateStation(m.station.opis_id, m.mile_marker, m.station.price) for m in on_route],
+            range_miles=vehicle.range_miles,
+            mpg=vehicle.mpg,
+            reserve_miles=vehicle.reserve_miles,
+        )
     stops = [
         PlannedStop(by_id[stop.station_id], stop.mile_marker, stop.gallons, stop.cost)
         for stop in fuel_plan.stops
