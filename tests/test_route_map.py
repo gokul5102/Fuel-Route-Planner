@@ -7,6 +7,7 @@ Grand Junction, Richfield and Las Vegas at $3.50; the I-40 Route is the alternat
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -112,3 +113,29 @@ def test_map_url_is_the_absolute_map_page_link_for_the_same_trip(client, station
     assert body["map"]["url"] == (
         "http://testserver/api/route/map/?start=41.8781%2C-87.6298&finish=34.0522%2C-118.2437"
     )
+
+
+def open_map(client, query: dict):
+    return client.get("/api/route/map/", query)
+
+
+def embedded_plan(html: str) -> dict:
+    """The plan the page hands to its script, from <script id="plan" type="application/json">."""
+    match = re.search(r'<script id="plan" type="application/json">(.*?)</script>', html, re.S)
+    assert match, "the page embeds no plan"
+    return json.loads(match[1])
+
+
+def test_the_map_page_draws_the_same_plan_with_leaflet(client, stations, osrm):
+    response = open_map(client, {"start": CHICAGO, "finish": LOS_ANGELES})
+
+    assert response.status_code == 200
+    assert response["Content-Type"].startswith("text/html")
+    html = response.content.decode()
+    assert "leaflet@1.9.4" in html
+    assert "tile.openstreetmap.org" in html
+    shown = embedded_plan(html)
+    assert shown["total_fuel_cost"] == 717.34
+    assert shown["route"] == {"distance_miles": 2018.03, "duration_hours": 35.36}
+    assert len(features_of(shown["map"]["geojson"], "fuel_stop")) == 8
+    assert len(osrm.calls) == 1

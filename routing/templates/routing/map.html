@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fuel plan: {{ start }} to {{ finish }}</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <style>
+    html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
+    #map { height: 100%; }
+    .summary { background: #fff; padding: 8px 12px; border-radius: 6px;
+               box-shadow: 0 1px 4px rgba(0, 0, 0, .3); line-height: 1.5; }
+    .summary h1 { font-size: 15px; margin: 0 0 4px; }
+    .stop-number { background: #1d4ed8; color: #fff; border: 2px solid #fff; border-radius: 50%;
+                   font: bold 12px/20px system-ui, sans-serif; text-align: center;
+                   box-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  {{ plan|json_script:"plan" }}
+  <script>
+    // The plan is the same JSON body GET /api/route/ returns; text is set with textContent only.
+    const plan = JSON.parse(document.getElementById("plan").textContent);
+    const features = plan.map.geojson.features;
+    const ofKind = (kind) => features.filter((f) => f.properties.kind === kind);
+    const money = (value) => "$" + value.toFixed(2);
+
+    const map = L.map("map");
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    function lines(rows) {
+      const box = document.createElement("div");
+      for (const row of rows) {
+        const line = document.createElement("div");
+        line.textContent = row;
+        box.appendChild(line);
+      }
+      return box;
+    }
+
+    // Alternatives first (grey, underneath), then the chosen Route (blue, on top).
+    let chosenLine;
+    for (const route of ofKind("route").sort((a, b) => a.properties.chosen - b.properties.chosen)) {
+      const p = route.properties;
+      const layer = L.geoJSON(route, {
+        style: p.chosen
+          ? { color: "#1d4ed8", weight: 5, opacity: 0.9 }
+          : { color: "#6b7280", weight: 4, opacity: 0.6, dashArray: "6 6" },
+      }).addTo(map);
+      layer.bindPopup(lines([
+        p.chosen ? "Chosen Route" : "Alternative Route",
+        p.distance_miles.toFixed(1) + " mi, " + p.duration_hours.toFixed(1) + " h",
+        p.total_fuel_cost === null ? "Cannot be fuelled (" + p.failure_code + ")"
+                                   : "Fuel " + money(p.total_fuel_cost),
+      ]));
+      if (p.chosen) chosenLine = layer;
+    }
+
+    for (const [kind, colour, label] of [["start", "#16a34a", "Start"], ["finish", "#dc2626", "Finish"]]) {
+      for (const point of ofKind(kind)) {
+        const [lon, lat] = point.geometry.coordinates;
+        L.circleMarker([lat, lon], { radius: 9, color: "#fff", weight: 2, fillColor: colour, fillOpacity: 1 })
+          .bindPopup(lines([label + ": " + point.properties.query]))
+          .addTo(map);
+      }
+    }
+
+    for (const stop of ofKind("fuel_stop")) {
+      const p = stop.properties;
+      const [lon, lat] = stop.geometry.coordinates;
+      const number = document.createElement("div");
+      number.textContent = p.number;
+      L.marker([lat, lon], {
+        icon: L.divIcon({ html: number, className: "stop-number", iconSize: [24, 24] }),
+        title: "Fuel stop " + p.number,
+      })
+        .bindPopup(lines([
+          p.number + ". " + p.name,
+          p.city + ", " + p.state,
+          money(p.price_per_gallon) + " / gal",
+          "Mile marker " + p.mile_marker.toFixed(1),
+          p.gallons.toFixed(3) + " gal for " + money(p.cost),
+        ]))
+        .addTo(map);
+    }
+
+    const summary = L.control({ position: "topright" });
+    summary.onAdd = () => {
+      const box = lines([
+        plan.route.distance_miles.toFixed(1) + " miles, " + plan.route.duration_hours.toFixed(1) + " hours",
+        "Total fuel cost " + money(plan.total_fuel_cost) + " (" + plan.total_gallons.toFixed(1) + " gal)",
+        plan.fuel_stops.length + " Fuel stops",
+      ]);
+      const title = document.createElement("h1");
+      title.textContent = plan.start.query + " to " + plan.finish.query;
+      box.prepend(title);
+      box.className = "summary";
+      return box;
+    };
+    summary.addTo(map);
+
+    map.fitBounds(chosenLine.getBounds(), { padding: [20, 20] });
+  </script>
+</body>
+</html>

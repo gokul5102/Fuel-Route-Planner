@@ -1,6 +1,8 @@
 from urllib.parse import urlencode
 
+from django.shortcuts import render
 from django.urls import reverse
+from django.views.decorators.http import require_GET
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.response import Response
@@ -49,6 +51,11 @@ class RouteView(APIView):
         return Response({**body, "map": {**body["map"], "url": url}})
 
 
+@require_GET
 def route_map(request):
-    """The plan drawn on a Leaflet map."""
-    raise NotImplementedError
+    """The same plan as GET /api/route/, drawn on a Leaflet map with OpenStreetMap tiles."""
+    query = RouteQuerySerializer(data=request.GET)
+    query.is_valid(raise_exception=True)
+    start, finish = query.validated_data["start"], query.validated_data["finish"]
+    body = plan_trip_body(start, finish)
+    return render(request, "routing/map.html", {"plan": body, "start": start, "finish": finish})
