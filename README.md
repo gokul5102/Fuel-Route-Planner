@@ -116,7 +116,7 @@ Every error has the same shape: `{"error": {"code", "message", "details"}}`.
 | 400 | `INVALID_INPUT` | `start` or `finish` is missing, blank, too long or bad coordinates; or both are the same place |
 | 405 | `METHOD_NOT_ALLOWED` | anything but GET |
 | 422 | `LOCATION_NOT_FOUND` | the place can't be found |
-| 422 | `LOCATION_OUTSIDE_USA` | the place is outside the USA (e.g. `Toronto, ON`) |
+| 422 | `LOCATION_OUTSIDE_USA` | the place is outside the USA's 50 states (e.g. `Toronto, ON`, or `San Juan, PR`) |
 | 422 | `NO_ROUTE` | OSRM has no drivable Route between the points |
 | 422 | `NO_STATION_AT_START` | no Station in the Start zone, so an empty tank can't leave |
 | 422 | `UNREACHABLE` | a gap longer than the Range; `details.mile_marker` says where the tank runs dry |
@@ -138,7 +138,9 @@ At startup, every Station is loaded from SQLite into an in-memory KD-tree
    after calling the API costs nothing.
 2. **Resolve the locations** (`routing/services/locations.py`). Each input is parsed as
    `"lat,lng"`, or looked up as `"City, ST"` (`places.py`, Census data), or sent to
-   Nominatim (`nominatim.py`). The result must be inside the USA (`usa.py`).
+   Nominatim (`nominatim.py`). Whichever form was used, the point must be inside a coarse
+   outline of the 50 states (`usa.py`), so Puerto Rico and the other territories are
+   rejected (no road reaches them anyway).
 3. **Route** (`routing/services/osrm.py`). One OSRM call with `alternatives=true` returns
    up to 3 Routes, as compact `polyline6` geometry.
 4. **Corridor** (`routing/services/corridor.py`). Each Route is resampled to one point per

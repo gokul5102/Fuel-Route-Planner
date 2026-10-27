@@ -175,3 +175,21 @@ def test_a_nominatim_timeout_is_a_provider_timeout(http):
         resolve_location(WACKER)
 
     assert error.value.code == "ROUTING_PROVIDER_TIMEOUT"
+
+
+def test_a_census_place_outside_the_usa_outline_is_rejected_without_any_http_call(http):
+    """The Census list includes Puerto Rico, but the outline (like "18.46,-66.10") excludes it."""
+    with pytest.raises(LocationOutsideUSA):
+        resolve_location("San Juan, PR")
+
+    assert len(http.calls) == 0
+
+
+def test_a_nominatim_answer_outside_the_usa_outline_is_rejected(http):
+    http.get(
+        NOMINATIM,
+        json=[{"lat": "18.4655", "lon": "-66.1057", "address": {"ISO3166-2-lvl4": "US-PR"}}],
+    )
+
+    with pytest.raises(LocationOutsideUSA):
+        resolve_location("Old San Juan")

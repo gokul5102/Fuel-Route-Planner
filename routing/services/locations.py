@@ -92,12 +92,22 @@ def check_distinct(start: "ResolvedLocation", finish: "ResolvedLocation") -> Non
 
 
 def resolve_location(query: str) -> ResolvedLocation:
+    """Find the point, however it was written, then check it lies inside the USA outline.
+
+    The check applies to every path, so Puerto Rico (in the Census list, outside the
+    outline) is rejected the same way as "18.46,-66.10".
+    """
+    location = _find(query)
+    if not is_in_usa(location.lat, location.lon):
+        raise LocationOutsideUSA(query)
+    return location
+
+
+def _find(query: str) -> ResolvedLocation:
     match = COORDINATES.match(query)
     if match:
         lat, lon = float(match[1]), float(match[2])
         if -90 <= lat <= 90 and -180 <= lon <= 180:
-            if not is_in_usa(lat, lon):
-                raise LocationOutsideUSA(query)
             return ResolvedLocation(query, lat, lon, "coordinates")
     state = None
     match = CITY_STATE.match(query)
