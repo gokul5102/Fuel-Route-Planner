@@ -63,6 +63,14 @@ def read_price_file_cities(path: Path) -> Counter[tuple[str, str]]:
         return Counter((row["City"].strip(), row["State"].strip()) for row in csv.DictReader(f))
 
 
+def read_done_cities(path: Path) -> set[tuple[str, str]]:
+    """(city, state) pairs already in the city coordinates file (empty if it doesn't exist)."""
+    if not path.exists():
+        return set()
+    with open(path, newline="", encoding="utf-8") as f:
+        return {(row["city"], row["state"]) for row in csv.DictReader(f)}
+
+
 class Command(BaseCommand):
     help = "Build data/us_places.csv and data/city_coords.csv (needs internet)."
 
@@ -80,12 +88,17 @@ class Command(BaseCommand):
             index.add(*subdivision)
 
         price_rows = read_price_file_cities(settings.PRICE_FILE)
+        done = read_done_cities(settings.CITY_COORDS_FILE)
+        new_cities = sorted(set(price_rows) - done)
+        self.stdout.write(f"{len(done)} cities already in the file, {len(new_cities)} new cities")
+
         self.nominatim_calls = 0
         self.failed = 0
-        with open(settings.CITY_COORDS_FILE, "w", newline="", encoding="utf-8") as f:
+        with open(settings.CITY_COORDS_FILE, "a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(CITY_COORDS_COLUMNS)
-            for city, state in sorted(price_rows):
+            if f.tell() == 0:  # new file: write the header first
+                writer.writerow(CITY_COORDS_COLUMNS)
+            for city, state in new_cities:
                 try:
                     lat, lon, source = self.locate(index, city, state)
                 except nominatim.NominatimError as exc:

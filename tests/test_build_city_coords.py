@@ -219,3 +219,37 @@ def test_a_failed_nominatim_request_is_left_out_so_the_next_run_retries_it(data_
 
     assert [r["city"] for r in read_csv(settings.CITY_COORDS_FILE)] == ["Smithtown"]
     assert "1 Nominatim request(s) failed" in out.getvalue()
+
+
+@responses.activate
+def test_a_rerun_skips_cities_already_in_the_file_and_makes_no_nominatim_calls(data_dir, settings):
+    settings.NOMINATIM_USER_AGENT = "test-agent/1.0"
+    write_prices(settings, ("Smithtown", "NY"), ("Tiny Spot", "TX"), ("Atlantis", "TX"))
+    nominatim_answers("Tiny Spot, TX", "us", [{"lat": "31.5", "lon": "-97.1"}])
+    nominatim_answers("Atlantis, TX", "us", [])
+    call_command("build_city_coords", stdout=io.StringIO())
+    first_run = settings.CITY_COORDS_FILE.read_text()
+    responses.calls.reset()
+
+    out = io.StringIO()
+    call_command("build_city_coords", stdout=out)
+
+    assert len(responses.calls) == 0
+    assert settings.CITY_COORDS_FILE.read_text() == first_run
+    assert "0 new cities" in out.getvalue()
+
+
+@responses.activate
+def test_a_rerun_only_looks_up_cities_new_to_the_price_file(data_dir, settings):
+    settings.NOMINATIM_USER_AGENT = "test-agent/1.0"
+    write_prices(settings, ("Tiny Spot", "TX"))
+    nominatim_answers("Tiny Spot, TX", "us", [{"lat": "31.5", "lon": "-97.1"}])
+    call_command("build_city_coords", stdout=io.StringIO())
+    responses.calls.reset()
+    write_prices(settings, ("Tiny Spot", "TX"), ("Toronto", "ON"))
+    nominatim_answers("Toronto, ON", "ca", [{"lat": "43.65", "lon": "-79.38"}])
+
+    call_command("build_city_coords", stdout=io.StringIO())
+
+    assert [call.request.params["q"] for call in responses.calls] == ["Toronto, ON"]
+    assert [r["city"] for r in read_csv(settings.CITY_COORDS_FILE)] == ["Tiny Spot", "Toronto"]
