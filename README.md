@@ -331,7 +331,7 @@ It needs the internet, and only a maintainer runs it after a new price file arri
 ## Development
 
 ```bash
-make test     # pytest: 161 tests, about 5 s; real network access is blocked
+make test     # pytest: 197 tests, about 6 s; real network access is blocked
 make lint     # ruff check + ruff format --check
 make format   # apply ruff fixes and formatting
 ```
