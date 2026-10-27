@@ -31,6 +31,17 @@ def test_ignores_parentheticals_hyphens_and_apostrophes():
     assert index.find("Lexington-Fayette", "KY") == (38.04, -84.46)
 
 
+def test_spaces_inside_a_name_are_ignored():
+    index = PlaceIndex()
+    index.add("McCalla CDP", "AL", 33.33, -87.03)
+    index.add("LaPlace CDP", "LA", 30.07, -90.48)
+    index.add("DeForest village", "WI", 43.24, -89.34)
+
+    assert index.find("MC CALLA", "AL") == (33.33, -87.03)
+    assert index.find("La Place", "LA") == (30.07, -90.48)
+    assert index.find("De Forest", "WI") == (43.24, -89.34)
+
+
 def test_accents_are_folded_so_plain_ascii_spellings_match():
     index = PlaceIndex()
     index.add("Cañon City city", "CO", 38.44, -105.22)

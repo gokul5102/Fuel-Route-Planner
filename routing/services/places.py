@@ -2,7 +2,7 @@
 
 Names are compared by a normalised *key* so that spelling differences between
 the fuel price file and the Census files still match, e.g. "SAINT LOUIS" and
-"St. Louis city" both become "st louis".
+"St. Louis city" both become "stlouis".
 """
 
 import csv
@@ -24,12 +24,12 @@ PARENTHETICAL = re.compile(r"\s*\(.*\)")
 
 
 def place_key(name: str) -> str:
-    """Normalise a city name for matching: case, accents, whitespace, punctuation, "Saint"."""
+    """Normalise a city name for matching: case, accents, spaces, punctuation, "Saint"."""
     key = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()  # ñ -> n
     key = key.lower().strip()
     key = key.replace("saint ", "st ").replace("st. ", "st ")
     key = key.replace(".", "").replace("'", "").replace("-", " ")
-    return re.sub(r"\s+", " ", key).strip()
+    return re.sub(r"\s+", "", key)  # "Mc Calla" = "McCalla", "La Place" = "LaPlace"
 
 
 class PlaceIndex:
