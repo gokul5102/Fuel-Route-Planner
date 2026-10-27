@@ -139,3 +139,25 @@ def test_the_map_page_draws_the_same_plan_with_leaflet(client, stations, osrm):
     assert shown["route"] == {"distance_miles": 2018.03, "duration_hours": 35.36}
     assert len(features_of(shown["map"]["geojson"], "fuel_stop")) == 8
     assert len(osrm.calls) == 1
+
+
+def test_the_map_page_shows_a_readable_error_for_bad_input(client):
+    response = open_map(client, {"start": "", "finish": LOS_ANGELES})
+
+    assert response.status_code == 400
+    assert response["Content-Type"].startswith("text/html")
+    html = response.content.decode()
+    assert "INVALID_INPUT" in html
+    assert "start" in html
+
+
+def test_the_map_page_shows_the_same_error_code_as_the_api(client, db, settings):
+    settings.OSRM_BASE_URL = "https://osrm.test"
+    with responses.RequestsMock() as mock:
+        mock.get(OSRM_URL, json={"code": "NoRoute", "message": "Impossible route between points"})
+
+        response = open_map(client, {"start": CHICAGO, "finish": LOS_ANGELES})
+
+    assert response.status_code == 422
+    assert response["Content-Type"].startswith("text/html")
+    assert "NO_ROUTE" in response.content.decode()

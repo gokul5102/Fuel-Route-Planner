@@ -8,6 +8,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from routing.errors import describe_error
 from routing.serializers import RouteQuerySerializer, serialize_trip_plan
 from routing.services.planner import plan_trip
 
@@ -53,9 +54,25 @@ class RouteView(APIView):
 
 @require_GET
 def route_map(request):
-    """The same plan as GET /api/route/, drawn on a Leaflet map with OpenStreetMap tiles."""
-    query = RouteQuerySerializer(data=request.GET)
-    query.is_valid(raise_exception=True)
-    start, finish = query.validated_data["start"], query.validated_data["finish"]
-    body = plan_trip_body(start, finish)
+    """The same plan as GET /api/route/, drawn on a Leaflet map with OpenStreetMap tiles.
+
+    A failure renders a short HTML page with the same error code and status as the API.
+    """
+    try:
+        query = RouteQuerySerializer(data=request.GET)
+        query.is_valid(raise_exception=True)
+        start, finish = query.validated_data["start"], query.validated_data["finish"]
+        body = plan_trip_body(start, finish)
+    except Exception as exc:  # describe_error logs the unexpected ones
+        status_code, body = describe_error(exc, request)
+        error = {**body["error"], "details": _as_text(body["error"]["details"])}
+        return render(request, "routing/map_error.html", {"error": error}, status=status_code)
     return render(request, "routing/map.html", {"plan": body, "start": start, "finish": finish})
+
+
+def _as_text(details: dict) -> dict[str, str]:
+    """Error details as one line of text each, e.g. {"start": "This field may not be blank."}."""
+    return {
+        field: " ".join(map(str, value)) if isinstance(value, list) else str(value)
+        for field, value in details.items()
+    }

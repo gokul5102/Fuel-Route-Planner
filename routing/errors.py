@@ -30,26 +30,32 @@ def error_body(code: str, message: str, details: dict | None = None) -> dict:
     return {"error": {"code": code, "message": message, "details": details or {}}}
 
 
-def api_exception_handler(exc: Exception, context: dict) -> Response:
-    """DRF's EXCEPTION_HANDLER: turn any exception from a view into the error envelope."""
+def describe_error(exc: Exception, request=None) -> tuple[int, dict]:
+    """The HTTP status and error envelope for any exception (the API and the map page use it)."""
     code = getattr(exc, "code", None)
     if isinstance(code, str) and code in STATUS_BY_CODE:  # a domain error from the services
         details = getattr(exc, "details", None)
-        return Response(error_body(code, str(exc), details), status=STATUS_BY_CODE[code])
+        return STATUS_BY_CODE[code], error_body(code, str(exc), details)
 
     if isinstance(exc, ValidationError):  # the query parameters failed validation
-        return Response(
-            error_body("INVALID_INPUT", "Check the query parameters.", exc.detail),
-            status=status.HTTP_400_BAD_REQUEST,
+        return status.HTTP_400_BAD_REQUEST, error_body(
+            "INVALID_INPUT", "Check the query parameters.", exc.detail
         )
 
-    response = drf_exception_handler(exc, context)
-    if response is not None and isinstance(exc, APIException):  # e.g. 405 for a POST
-        response.data = error_body(exc.default_code.upper(), str(exc.detail))
-        return response
+    if isinstance(exc, APIException):  # e.g. 405 for a POST
+        return exc.status_code, error_body(exc.default_code.upper(), str(exc.detail))
 
-    logger.exception("Unexpected error while handling %s", context.get("request"))
-    return Response(
-        error_body("INTERNAL_ERROR", "Something went wrong on our side."),
-        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    logger.exception("Unexpected error while handling %s", request)
+    return status.HTTP_500_INTERNAL_SERVER_ERROR, error_body(
+        "INTERNAL_ERROR", "Something went wrong on our side."
     )
+
+
+def api_exception_handler(exc: Exception, context: dict) -> Response:
+    """DRF's EXCEPTION_HANDLER: turn any exception from a view into the error envelope."""
+    status_code, body = describe_error(exc, context.get("request"))
+    response = drf_exception_handler(exc, context)  # keeps headers such as Allow on a 405
+    if response is None:
+        return Response(body, status=status_code)
+    response.data, response.status_code = body, status_code
+    return response

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>No map: {{ error.code }}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem;
+           color: #111827; line-height: 1.5; }
+    code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>The map could not be drawn</h1>
+  <p>{{ error.message }}</p>
+  <p>Error code: <code>{{ error.code }}</code></p>
+  {% if error.details %}
+    <ul>
+      {% for field, problem in error.details.items %}
+        <li><strong>{{ field }}</strong>: {{ problem }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  <p>The same request to <code>/api/route/</code> returns this error as JSON.</p>
+</body>
+</html>
