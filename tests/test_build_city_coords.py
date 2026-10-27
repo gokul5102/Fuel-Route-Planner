@@ -16,6 +16,7 @@ PLACES_TXT = (
     "OK\t4006050\tBig Cabin town\t1\t36.540\t-95.220\n"
     "MO\t2965000\tSt. Louis city\t1\t38.635\t-90.244\n"
     "MO\t2938000\tKansas City city\t1\t39.125\t-94.551\n"
+    "CO\t0811810\tCañon City city\t1\t38.44\t-105.22\n"
 )
 COUSUBS_TXT = (
     "USPS\tGEOID\tNAME\tALAND\tINTPTLAT\tINTPTLONG                    \n"
@@ -27,7 +28,7 @@ PRICE_HEADER = "OPIS Truckstop ID,Truckstop Name,Address,City,State,Rack ID,Reta
 def zipped(member: str, text: str) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr(member, text.encode("latin-1"))
+        archive.writestr(member, text.encode("utf-8"))
     return buffer.getvalue()
 
 
@@ -108,6 +109,7 @@ def test_writes_the_us_places_file_from_the_census_places_only(data_dir, setting
         {"name": "Big Cabin town", "state": "OK", "lat": "36.54", "lon": "-95.22"},
         {"name": "St. Louis city", "state": "MO", "lat": "38.635", "lon": "-90.244"},
         {"name": "Kansas City city", "state": "MO", "lat": "39.125", "lon": "-94.551"},
+        {"name": "Cañon City city", "state": "CO", "lat": "38.44", "lon": "-105.22"},
     ]
 
 

@@ -48,10 +48,10 @@ def download_once(url: str, path: Path) -> None:
 
 
 def read_gazetteer(zip_path: Path) -> Iterator[tuple[str, str, float, float]]:
-    """Yield (name, state, lat, lon) from a Gazetteer zip (tab-separated, latin-1)."""
+    """Yield (name, state, lat, lon) from a Gazetteer zip (tab-separated, UTF-8)."""
     with zipfile.ZipFile(zip_path) as archive:
         member = next(n for n in archive.namelist() if n.endswith(".txt"))
-        text = archive.read(member).decode("latin-1")
+        text = archive.read(member).decode("utf-8")
     for row in csv.DictReader(io.StringIO(text), delimiter="\t"):
         row = {key.strip(): value for key, value in row.items()}
         yield row["NAME"], row["USPS"], float(row["INTPTLAT"]), float(row["INTPTLONG"])

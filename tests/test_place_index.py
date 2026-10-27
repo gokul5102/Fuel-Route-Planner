@@ -31,6 +31,13 @@ def test_ignores_parentheticals_hyphens_and_apostrophes():
     assert index.find("Lexington-Fayette", "KY") == (38.04, -84.46)
 
 
+def test_accents_are_folded_so_plain_ascii_spellings_match():
+    index = PlaceIndex()
+    index.add("Cañon City city", "CO", 38.44, -105.22)
+
+    assert index.find("CANON CITY", "CO") == (38.44, -105.22)
+
+
 def test_state_must_match_and_unknown_cities_return_none():
     index = PlaceIndex()
     index.add("Springfield city", "IL", 39.78, -89.65)

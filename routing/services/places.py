@@ -7,6 +7,7 @@ the fuel price file and the Census files still match, e.g. "SAINT LOUIS" and
 
 import csv
 import re
+import unicodedata
 from pathlib import Path
 
 LatLon = tuple[float, float]
@@ -23,8 +24,9 @@ PARENTHETICAL = re.compile(r"\s*\(.*\)")
 
 
 def place_key(name: str) -> str:
-    """Normalise a city name for matching: case, whitespace, punctuation, "Saint" -> "st"."""
-    key = name.lower().strip()
+    """Normalise a city name for matching: case, accents, whitespace, punctuation, "Saint"."""
+    key = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()  # ñ -> n
+    key = key.lower().strip()
     key = key.replace("saint ", "st ").replace("st. ", "st ")
     key = key.replace(".", "").replace("'", "").replace("-", " ")
     return re.sub(r"\s+", " ", key).strip()
