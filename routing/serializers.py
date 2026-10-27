@@ -3,7 +3,8 @@
 from rest_framework import serializers
 
 from routing.services.locations import COORDINATES, ResolvedLocation
-from routing.services.planner import PlannedStop, TripPlan, Vehicle
+from routing.services.osrm import RoutedPath
+from routing.services.planner import PlannedStop, RouteOption, TripPlan, Vehicle
 
 
 class RouteQuerySerializer(serializers.Serializer):
@@ -36,14 +37,28 @@ def serialize_trip_plan(trip: TripPlan) -> dict:
     return {
         "start": _location(trip.start),
         "finish": _location(trip.finish),
-        "route": {
-            "distance_miles": round(plan.route.distance_miles, 2),
-            "duration_hours": round(plan.route.duration_hours, 2),
-        },
+        "route": _route(plan.route),
         "fuel_stops": [_fuel_stop(stop) for stop in plan.stops],
         "total_gallons": round(plan.total_gallons, 3),
         "total_fuel_cost": float(plan.total_cost),
+        "alternatives": [_alternative(option) for option in trip.alternatives],
         "assumptions": _assumptions(trip.vehicle),
+    }
+
+
+def _route(route: RoutedPath) -> dict:
+    return {
+        "distance_miles": round(route.distance_miles, 2),
+        "duration_hours": round(route.duration_hours, 2),
+    }
+
+
+def _alternative(option: RouteOption) -> dict:
+    """A Route not chosen, as a summary only: its fuel cost, or why it cannot be fuelled."""
+    return {
+        **_route(option.route),
+        "total_fuel_cost": float(option.plan.total_cost),
+        "failure_code": None,
     }
 
 

@@ -59,11 +59,20 @@ class RoutePlan:
 
 
 @dataclass(frozen=True)
+class RouteOption:
+    """One Route OSRM offered, with its fuel plan."""
+
+    route: RoutedPath
+    plan: RoutePlan
+
+
+@dataclass(frozen=True)
 class TripPlan:
     start: ResolvedLocation
     finish: ResolvedLocation
-    plan: RoutePlan
+    plan: RoutePlan  # the chosen Route's plan
     vehicle: Vehicle
+    alternatives: list[RouteOption]  # the Routes not chosen, in OSRM's order
 
 
 def plan_trip(start_query: str, finish_query: str) -> TripPlan:
@@ -72,16 +81,20 @@ def plan_trip(start_query: str, finish_query: str) -> TripPlan:
     finish = resolve_location(finish_query)
     check_distinct(start, finish)
     routes = fetch_routes((start.lat, start.lon), (finish.lat, finish.lon))
-    plan = choose_cheapest_route(routes, get_station_index(), vehicle)
-    return TripPlan(start, finish, plan, vehicle)
+    plan, alternatives = choose_cheapest_route(routes, get_station_index(), vehicle)
+    return TripPlan(start, finish, plan, vehicle, alternatives)
 
 
 def choose_cheapest_route(
     routes: list[RoutedPath], index: StationIndex, vehicle: Vehicle
-) -> RoutePlan:
-    """Plan every Route OSRM offered; the one with the cheapest fuel wins."""
-    plans = [plan_route(route, index, vehicle) for route in routes]
-    return min(plans, key=lambda plan: plan.total_cost)
+) -> tuple[RoutePlan, list[RouteOption]]:
+    """Plan every Route OSRM offered; the one with the cheapest fuel wins.
+
+    Returns the winner's plan and the other Routes (the alternatives).
+    """
+    options = [RouteOption(route, plan_route(route, index, vehicle)) for route in routes]
+    winner = min(options, key=lambda option: option.plan.total_cost)
+    return winner.plan, [option for option in options if option is not winner]
 
 
 def plan_route(route: RoutedPath, index: StationIndex, vehicle: Vehicle) -> RoutePlan:

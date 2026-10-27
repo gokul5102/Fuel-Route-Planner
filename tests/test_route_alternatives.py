@@ -85,3 +85,22 @@ def test_the_slower_route_wins_when_its_fuel_is_cheaper(client, db, osrm):
     assert body["total_fuel_cost"] == 667.24
     assert [stop["station_id"] for stop in body["fuel_stops"]] == [1, 21, 22, 23, 24, 25]
     assert len(osrm.calls) == 1
+
+
+def test_the_route_not_chosen_is_summarised_with_its_fuel_cost(client, db, osrm):
+    add_stations([CHICAGO_STATION], "4.00")
+    add_stations(I80_STATIONS, "3.50")
+    add_stations(I40_STATIONS, "3.00")
+
+    body = plan(client).json()
+
+    assert body["alternatives"] == [
+        {
+            "distance_miles": 2018.03,
+            "duration_hours": 35.36,
+            # 22.03 gal at $4.00 to reach Iowa City, then 179.773 gal at $3.50 = $717.3255;
+            # each of its 8 stops is rounded to the cent, which adds up to $717.34
+            "total_fuel_cost": 717.34,
+            "failure_code": None,
+        }
+    ]
