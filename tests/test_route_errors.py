@@ -8,6 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+import requests
 import responses
 
 from routing.models import Station
@@ -103,3 +104,54 @@ def test_a_gap_beyond_the_range_is_unreachable_with_the_mile_marker_where_fuel_r
     error = error_of(plan(client), 422, "UNREACHABLE")
 
     assert error["details"] == {"mile_marker": 500.0}
+
+
+@pytest.mark.parametrize(
+    ("osrm_code", "message"),
+    [
+        ("NoRoute", "Impossible route between points"),
+        ("NoSegment", "Could not find a matching segment for coordinate"),
+    ],
+)
+def test_osrm_finding_no_road_between_the_points_is_no_route(client, osrm, osrm_code, message):
+    osrm.get(OSRM_URL, status=400, json={"code": osrm_code, "message": message})
+
+    error = error_of(plan(client), 422, "NO_ROUTE")
+
+    assert error["details"] == {"provider_code": osrm_code}
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        {"status": 503, "body": "<html>Service Unavailable</html>"},
+        {"status": 500, "json": {"code": "InternalError"}},
+        {"status": 400, "json": {"code": "TooBig", "message": "Too many coordinates"}},
+        {"status": 200, "body": "not json"},
+        {"body": requests.exceptions.ConnectionError("connection refused")},
+    ],
+)
+def test_osrm_failing_is_a_routing_provider_error(client, osrm, failure):
+    osrm.get(OSRM_URL, **failure)
+
+    error_of(plan(client), 502, "ROUTING_PROVIDER_ERROR")
+
+
+@pytest.mark.parametrize(
+    "timeout", [requests.exceptions.ReadTimeout(), requests.exceptions.ConnectTimeout()]
+)
+def test_osrm_timing_out_is_a_routing_provider_timeout(client, osrm, timeout):
+    osrm.get(OSRM_URL, body=timeout)
+
+    error_of(plan(client), 504, "ROUTING_PROVIDER_TIMEOUT")
+
+
+def test_an_unexpected_failure_still_uses_the_envelope(client, monkeypatch):
+    def broken_planner(start, finish):
+        raise RuntimeError("bug")
+
+    monkeypatch.setattr("routing.views.plan_trip", broken_planner)
+
+    error = error_of(plan(client), 500, "INTERNAL_ERROR")
+
+    assert "bug" not in error["message"]  # internals are logged, not shown
