@@ -84,6 +84,18 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+# --- Logging ----------------------------------------------------------------------
+# The app's own loggers print to the console; "routing.requests" writes one line per
+# request with its external calls and per-stage timings.
+
+LOG_LEVEL = env("LOG_LEVEL", default="INFO")
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"routing": {"handlers": ["console"], "level": LOG_LEVEL}},
+}
+
 # --- API docs ---------------------------------------------------------------
 
 REST_FRAMEWORK = {

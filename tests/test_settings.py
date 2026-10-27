@@ -18,3 +18,8 @@ def test_external_service_urls_are_configured():
     assert settings.OSRM_BASE_URL.startswith("https://")
     assert settings.NOMINATIM_BASE_URL.startswith("https://")
     assert settings.NOMINATIM_USER_AGENT
+
+
+def test_request_log_lines_are_shown_at_info_by_default():
+    assert settings.LOG_LEVEL == "INFO"
+    assert settings.LOGGING["loggers"]["routing"]["level"] == "INFO"

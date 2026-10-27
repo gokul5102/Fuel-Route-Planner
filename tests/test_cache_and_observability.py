@@ -5,6 +5,7 @@ OSRM is mocked with the recorded Chicago -> Los Angeles Route; Nominatim is mock
 """
 
 import json
+import logging
 
 import pytest
 import responses
@@ -136,6 +137,18 @@ def test_the_map_page_after_the_api_makes_no_external_calls(client, http):
     assert page.status_code == 200
     assert page.headers["X-External-Calls"] == "0"
     assert len(http.calls) == 1
+
+
+@pytest.mark.usefixtures("stations")
+def test_each_request_logs_its_status_calls_and_stage_timings(client, http, caplog):
+    with caplog.at_level(logging.INFO, logger="routing.requests"):
+        plan(client)
+
+    [record] = caplog.records
+    line = record.getMessage()
+    assert line.startswith("GET /api/route/ 200 external_calls=1 total_ms=")
+    for stage in ("geocode", "routing", "corridor", "optimize"):
+        assert f"{stage}_ms=" in line
 
 
 @pytest.mark.usefixtures("stations")
