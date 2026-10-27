@@ -5,6 +5,7 @@ from rest_framework import serializers
 from routing.services.locations import COORDINATES, ResolvedLocation
 from routing.services.osrm import RoutedPath
 from routing.services.planner import PlannedStop, RouteOption, TripPlan, Vehicle
+from routing.services.route_map import trip_geojson
 
 
 class RouteQuerySerializer(serializers.Serializer):
@@ -43,6 +44,7 @@ def serialize_trip_plan(trip: TripPlan) -> dict:
         "total_fuel_cost": float(plan.total_cost),
         "alternatives": [_alternative(option) for option in trip.alternatives],
         "assumptions": _assumptions(trip.vehicle),
+        "map": {"geojson": trip_geojson(trip)},
     }
 
 
