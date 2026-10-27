@@ -164,6 +164,14 @@ def test_coordinates_outside_the_usa_are_rejected(http, query):
         resolve_location(query)
 
 
+def test_coordinates_written_as_lng_lat_are_rejected_with_the_right_order_suggested(http):
+    with pytest.raises(LocationOutsideUSA) as error:
+        resolve_location("-87.6298, 41.8781")  # Chicago, longitude first
+
+    assert "latitude first" in str(error.value)
+    assert error.value.details == {"query": "-87.6298, 41.8781", "did_you_mean": "41.8781,-87.6298"}
+
+
 @pytest.mark.parametrize(
     "query",
     [

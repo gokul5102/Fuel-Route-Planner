@@ -32,7 +32,7 @@ from routing.services.locations import normalise_query
 from routing.services.places import get_place_index
 from routing.services.planner import Vehicle, plan_trip
 
-PLAN_BODY_VERSION = 2  # 2: unfuellable Routes left out of `alternatives`
+PLAN_BODY_VERSION = 3  # 2: unfuellable Routes left out of `alternatives`; 3: `on_route`
 
 
 def plan_trip_body(start: str, finish: str) -> tuple[dict, str]:

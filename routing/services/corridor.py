@@ -26,6 +26,9 @@ LatLon = tuple[float, float]
 class CorridorStation:
     station: IndexedStation
     mile_marker: float
+    on_route: bool = (
+        True  # False for the Station nearest the start, used when the Start zone has none
+    )
 
 
 def resample(route: list[LatLon], step_miles: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
@@ -72,5 +75,5 @@ def stations_in_corridor(
     empty_start_zone = not any(match.mile_marker == 0 for match in matches)
     if start_at_nearest_station and empty_start_zone and (first := index.nearest(sample_points[0])):
         matches = [m for m in matches if m.station.opis_id != first.opis_id]
-        matches.append(CorridorStation(first, 0.0))
+        matches.append(CorridorStation(first, 0.0, on_route=False))
     return sorted(matches, key=lambda m: (m.mile_marker, m.station.opis_id))

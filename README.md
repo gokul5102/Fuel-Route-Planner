@@ -79,10 +79,12 @@ GeoJSON features are left out here:
   "fuel_stops": [
     {"station_id": 72773, "name": "RaceTrac #2626", "address": "I-20 Exit 472",
      "city": "Dallas", "state": "TX", "lat": 32.793333, "lon": -96.766513,
-     "price_per_gallon": 2.864, "mile_marker": 0.0, "gallons": 1.597, "cost": 4.57},
+     "price_per_gallon": 2.864, "mile_marker": 0.0, "gallons": 1.597, "cost": 4.57,
+     "on_route": true},
     {"station_id": 63669, "name": "One9 #1248", "address": "I-45, EXIT 271",
      "city": "Wilmer", "state": "TX", "lat": 32.599015, "lon": -96.681585,
-     "price_per_gallon": 2.75566666, "mile_marker": 16.0, "gallons": 22.228, "cost": 61.25}
+     "price_per_gallon": 2.75566666, "mile_marker": 16.0, "gallons": 22.228, "cost": 61.25,
+     "on_route": true}
   ],
   "total_gallons": 23.825,
   "total_fuel_cost": 65.82,
@@ -162,13 +164,25 @@ in one place.
 
 ## Assumptions
 
-- **Empty tank at the start.** So the first Fuel stop is at Mile marker 0: the cheapest
-  Station in the Start zone (the first 8 miles). When the Start zone has none, the truck
-  is assumed to start at the Station nearest the start, however far away, because with 0
-  fuel it has to begin at a pump. That matters for small towns: 58% of the 31,825 places
-  the autocomplete offers have no Station within 8 miles. The drive to that Station is not
-  costed. The total gallons bought equal distance / MPG; no fuel is left over at the
-  finish, and the Reserve is 0.
+- **Empty tank at the start.** With 0 fuel the truck has to begin at a pump, so the first
+  Fuel stop is at Mile marker 0:
+  - the cheapest Station in the Start zone (the first 8 miles of the Route), or
+  - when the Start zone has none, the Station nearest the start, **however far away**.
+    The truck is assumed to start there, and the drive to it is not costed. That stop has
+    `"on_route": false`, and the map tags it "trip starts here".
+
+  The fallback matters for small towns: 58% of the 31,825 places the autocomplete offers
+  have no Station within 8 miles. For half of those the nearest is within 15 miles, but it
+  can be far: Key West starts at Marathon, FL (49 miles), and Fairbanks, AK at Whitehorse, Yukon
+  (488 miles). The nearest Station can even lie past the finish: Española → Santa Fe, NM
+  starts at Algodones, 50 miles away, for a 28-mile trip.
+- **Fuel bought.** The total gallons equal Route distance / MPG. No fuel is left over at
+  the finish, and the Reserve is 0. A 0-mile Route (two points that snap to the same spot
+  on the road) needs no fuel and has no Fuel stops.
+- **Only Routes that can be fuelled are offered.** OSRM returns up to 3 Routes. Any Route
+  with a gap longer than the Range between Stations is dropped. It appears neither in
+  `alternatives` nor on the map. If no Route can be fuelled, the request fails with
+  `UNREACHABLE` (or `NO_STATION_AT_START`).
 - **8-mile Corridor.** A Station counts as on the Route if it is within 8 miles of it. I
   checked this on 5 real Routes with 160 Stations at interstate exits on the Route. An
   8-mile Corridor catches 86% of them, against 68% at 3 miles and 82% at 5 miles. Going to
@@ -185,6 +199,13 @@ in one place.
   be in the USA.
 - **Money.** Each stop's cost is rounded to cents, and the total is the sum of the rounded
   stop costs.
+- **Locations.**
+  - Coordinates are written latitude first (`"41.8781,-87.6298"`). If they look swapped,
+    the error suggests the right order.
+  - `"City, ST"` uses the Census point of that place. About 200 names repeat within a state (two
+    "Springfield, PA"); the first in the Census file is used.
+  - Autocomplete offers only places that pass the USA check, so every suggestion plans
+    without a geocoding call.
 - **Configurable.** Range, MPG, Reserve and Corridor width are settings in `.env`.
 
 ## Why the plan is the cheapest
@@ -315,6 +336,11 @@ you have one.
   fine for a demo but not for heavy traffic.
 - **Unreachable places.** Hawaii and other places with no road to the start can't be
   planned (`NO_ROUTE`).
+- **Gaps in the price file.** Some Routes run longer than the Range between Stations in
+  the file. Anchorage → Seattle crosses Yukon and British Columbia, and fails with
+  `UNREACHABLE` at Mile marker 500. The highway has fuel, but the file has no Station there.
+- **The fallback start can be far away.** With no distance limit, the Station the truck
+  starts at can be hundreds of miles from the place typed (488 miles for Fairbanks).
 - **No production setup.** There is no authentication, rate limiting or production server
   configuration.
 

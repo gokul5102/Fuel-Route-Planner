@@ -60,6 +60,7 @@ SAMPLE_PLAN = {
             "mile_marker": 0.0,
             "gallons": 1.597,
             "cost": 4.57,
+            "on_route": True,
         },
         {
             "station_id": 63669,
@@ -73,6 +74,7 @@ SAMPLE_PLAN = {
             "mile_marker": 16.0,
             "gallons": 22.228,
             "cost": 61.25,
+            "on_route": True,
         },
     ],
     "total_gallons": 23.825,
@@ -136,6 +138,7 @@ SAMPLE_PLAN = {
                         "mile_marker": 0.0,
                         "gallons": 1.597,
                         "cost": 4.57,
+                        "on_route": True,
                     },
                 },
                 {
@@ -153,6 +156,7 @@ SAMPLE_PLAN = {
                         "mile_marker": 16.0,
                         "gallons": 22.228,
                         "cost": 61.25,
+                        "on_route": True,
                     },
                 },
             ],

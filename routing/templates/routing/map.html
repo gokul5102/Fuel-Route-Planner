@@ -162,7 +162,7 @@
     hours(plan.route.duration_hours),
     stopCount + (stopCount === 1 ? " stop" : " stops"),
     gallons(plan.total_gallons),
-    "avg " + pricePerGallon(average),
+    ...(plan.total_gallons ? ["avg " + pricePerGallon(average)] : []),  // a 0-mile trip buys nothing
   ].map((fact) => element("span", "", fact)));
   const a = plan.assumptions;
   document.getElementById("assumptions").append(...[
@@ -173,9 +173,12 @@
     "Planned on " + (plan.alternatives.length + 1) + " Route(s) from one OSRM call; the cheapest is shown.",
   ].map((text) => element("li", "", text)));
 
-  // ---- Map. Leaflet needs a view before vector layers are added, so fit the chosen Route first.
+  // ---- Map. Leaflet needs a view before vector layers are added, so fit the chosen Route first,
+  // with its Fuel stops: the first can be far off the Route when the truck starts at the nearest Station.
   const chosenRoute = ofKind("route").find((route) => route.properties.chosen);
-  const map = L.map("map", { zoomSnap: 0.25 }).fitBounds(L.geoJSON(chosenRoute).getBounds(), { padding: [32, 32] });
+  const view = L.geoJSON(chosenRoute).getBounds();
+  for (const stop of plan.fuel_stops) view.extend([stop.lat, stop.lon]);
+  const map = L.map("map", { zoomSnap: 0.25, maxZoom: 19 }).fitBounds(view, { padding: [32, 32], maxZoom: 15 });
   // OpenStreetMap's tile servers block requests without a Referer, and Django's default
   // same-origin Referrer-Policy strips it, so the tile layer asks for one explicitly.
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -223,7 +226,8 @@
     box.append(
       element("div", "title", stop.number + ". " + titleCase(stop.name)),
       element("div", "muted", stop.address + ", " + stop.city + ", " + stop.state),
-      element("div", "muted", "Mile " + wholeMiles.format(stop.mile_marker)),
+      element("div", "muted", stop.on_route ? "Mile " + wholeMiles.format(stop.mile_marker)
+                                             : "Off the Route: the trip starts here"),
       element("div", "num", gallons(stop.gallons) + " × " + pricePerGallon(stop.price_per_gallon) + " = " + usd.format(stop.cost)),
     );
     return box;
@@ -259,9 +263,9 @@
     }).bindPopup(popupContent(stop)).addTo(map);
     marker.on("click", () => activate(stop.number));
 
-    // With no Station in the Start zone, the first stop is the nearest Station to the start, off the Route.
-    const awayFromStart = stop.number === 1 ? milesBetween(plan.start, stop) : 0;
-    const offRoute = awayFromStart > a.start_zone_miles;
+    // With no Station in the Start zone, the trip starts at the Station nearest the start, off the Route.
+    const offRoute = !stop.on_route;
+    const awayFromStart = offRoute ? milesBetween(plan.start, stop) : 0;
     const name = element("div", "name", titleCase(stop.name));
     name.title = stop.name;
     if (offRoute) name.append(element("span", "tag", "trip starts here"));

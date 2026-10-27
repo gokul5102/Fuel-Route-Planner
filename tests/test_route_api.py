@@ -100,6 +100,7 @@ def test_plans_the_cheapest_fuel_stops_from_chicago_to_los_angeles(client, stati
         (112, 1579.1, 5.106, 18.12),  # Los Angeles is in Range: just enough to arrive
     ]
     assert body["total_gallons"] == 201.803  # 2,018.03 miles / 10 MPG
+    assert all(stop["on_route"] for stop in body["fuel_stops"])  # Chicago is in the Start zone
     assert body["total_fuel_cost"] == 687.6
     assert len(osrm.calls) == 1
 
@@ -132,6 +133,7 @@ def test_each_fuel_stop_carries_the_station_details(client, stations, osrm):
         "mile_marker": 0.0,
         "gallons": 22.03,
         "cost": 85.89,
+        "on_route": True,
     }
 
 
@@ -158,6 +160,9 @@ def test_with_no_station_in_the_start_zone_the_trip_fills_up_at_the_nearest_one(
     first = response.json()["fuel_stops"][0]
     # the same price as Cheap Chicago, so the same purchase: just enough to reach Iowa City
     assert (first["station_id"], first["mile_marker"], first["gallons"]) == (901, 0.0, 22.03)
+    # off the Route: the truck is assumed to start there
+    assert first["on_route"] is False
+    assert all(stop["on_route"] for stop in response.json()["fuel_stops"][1:])
 
 
 def test_states_the_assumptions_behind_the_plan(client, stations, osrm):

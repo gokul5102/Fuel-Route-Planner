@@ -66,6 +66,18 @@ class LocationOutsideUSA(LocationError):
         super().__init__(f"{query!r} is outside the USA; only US trips can be planned.", query)
 
 
+class SwappedCoordinates(LocationOutsideUSA):
+    """ "lng,lat" that lands outside the USA, when "lat,lng" would land inside it."""
+
+    def __init__(self, query: str, lat: float, lon: float) -> None:
+        LocationError.__init__(
+            self,
+            f"{query!r} is outside the USA. Coordinates go latitude first: try '{lat:g},{lon:g}'.",
+            query,
+        )
+        self.details = {"query": query, "did_you_mean": f"{lat},{lon}"}
+
+
 class GeocodingFailed(LocationError):
     """Nominatim could not be reached or answered with an error (an upstream failure)."""
 
@@ -99,6 +111,9 @@ def resolve_location(query: str) -> ResolvedLocation:
     """
     location = _find(query)
     if not is_in_usa(location.lat, location.lon):
+        swapped = location.resolved_by == "coordinates" and is_in_usa(location.lon, location.lat)
+        if swapped:
+            raise SwappedCoordinates(query, lat=location.lon, lon=location.lat)
         raise LocationOutsideUSA(query)
     return location
 

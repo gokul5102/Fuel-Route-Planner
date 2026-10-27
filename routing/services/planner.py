@@ -49,6 +49,7 @@ class PlannedStop:
     mile_marker: float
     gallons: float
     cost: Decimal
+    on_route: bool  # False when the truck is assumed to start at this off-Route Station
 
 
 @dataclass(frozen=True)
@@ -126,24 +127,30 @@ def plan_route(route: RoutedPath, index: StationIndex, vehicle: Vehicle) -> Rout
     Raises the optimizer's FuelPlanError when the Route cannot be fuelled.
     """
     with stage("corridor"):
-        on_route = stations_in_corridor(
+        matches = stations_in_corridor(
             route.points,
             index,
             corridor_miles=vehicle.corridor_miles,
             route_miles=route.distance_miles,
             start_at_nearest_station=True,  # the tank starts empty
         )
-    by_id = {match.station.opis_id: match.station for match in on_route}
+    by_id = {match.station.opis_id: match for match in matches}
     with stage("optimize"):
         fuel_plan = plan_fuel_stops(
             route.distance_miles,
-            [CandidateStation(m.station.opis_id, m.mile_marker, m.station.price) for m in on_route],
+            [CandidateStation(m.station.opis_id, m.mile_marker, m.station.price) for m in matches],
             range_miles=vehicle.range_miles,
             mpg=vehicle.mpg,
             reserve_miles=vehicle.reserve_miles,
         )
     stops = [
-        PlannedStop(by_id[stop.station_id], stop.mile_marker, stop.gallons, stop.cost)
+        PlannedStop(
+            station=by_id[stop.station_id].station,
+            mile_marker=stop.mile_marker,
+            gallons=stop.gallons,
+            cost=stop.cost,
+            on_route=by_id[stop.station_id].on_route,
+        )
         for stop in fuel_plan.stops
     ]
     return RoutePlan(route, stops, fuel_plan.total_gallons, fuel_plan.total_cost)

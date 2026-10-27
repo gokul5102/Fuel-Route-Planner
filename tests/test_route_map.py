@@ -90,6 +90,7 @@ def test_the_geojson_has_start_finish_and_numbered_fuel_stops_as_points(client, 
         "mile_marker": 0.0,
         "gallons": 22.03,
         "cost": 88.12,
+        "on_route": True,
     }
     assert [s["properties"]["station_id"] for s in stops] == [
         stop["station_id"] for stop in body["fuel_stops"]

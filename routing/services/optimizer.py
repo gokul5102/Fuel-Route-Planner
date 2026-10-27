@@ -81,6 +81,8 @@ def plan_fuel_stops(
     reserve_miles: float = 0,
 ) -> FuelPlan:
     """Return the cheapest Fuel stops, or raise NoStationAtStart / Unreachable."""
+    if distance_miles <= 0:  # start and finish snapped to the same spot: nothing to drive
+        return FuelPlan(stops=[], total_gallons=0.0, total_cost=Decimal("0.00"))
     usable_range = range_miles - reserve_miles
     stops_by_marker = _cheapest_per_mile_marker(stations, distance_miles)
     if not stops_by_marker or stops_by_marker[0].mile_marker != 0:

@@ -70,6 +70,15 @@ def test_a_gap_longer_than_the_range_is_unreachable_at_the_mile_marker_where_fue
     assert failure.value.mile_marker == 600
 
 
+def test_a_zero_mile_route_needs_no_fuel():
+    # OSRM snaps two points a few metres apart to the same spot on the road
+    result = plan(0.0, station(1, 0, "3.00"))
+
+    assert result.stops == []
+    assert result.total_gallons == 0
+    assert result.total_cost == Decimal("0.00")
+
+
 def test_no_station_at_the_start_means_an_empty_tank_cannot_leave():
     with pytest.raises(NoStationAtStart) as failure:
         plan(300, station(1, 5, "3.00"))

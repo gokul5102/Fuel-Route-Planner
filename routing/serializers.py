@@ -32,11 +32,20 @@ class RouteQuerySerializer(serializers.Serializer):
 
 def _valid_coordinates_if_given(value: str) -> str:
     match = COORDINATES.match(value)
-    if match and not (-90 <= float(match[1]) <= 90 and -180 <= float(match[2]) <= 180):
+    if match and not _in_range(float(match[1]), float(match[2])):
+        if _in_range(float(match[2]), float(match[1])):  # written longitude first
+            raise serializers.ValidationError(
+                "Coordinates go latitude first (-90..90), then longitude: "
+                f"try '{match[2]},{match[1]}'."
+            )
         raise serializers.ValidationError(
             "Coordinates must be latitude -90..90 and longitude -180..180."
         )
     return value
+
+
+def _in_range(lat: float, lon: float) -> bool:
+    return -90 <= lat <= 90 and -180 <= lon <= 180
 
 
 def serialize_trip_plan(trip: TripPlan) -> dict:
@@ -113,6 +122,7 @@ def _fuel_stop(stop: PlannedStop) -> dict:
         "mile_marker": round(stop.mile_marker, 1),
         "gallons": round(stop.gallons, 3),
         "cost": float(stop.cost),
+        "on_route": stop.on_route,
     }
 
 

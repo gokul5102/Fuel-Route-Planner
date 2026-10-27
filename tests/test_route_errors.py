@@ -84,6 +84,16 @@ def test_an_unparseable_location_is_invalid_input(client, value):
     assert "start" in error["details"]
 
 
+def test_lng_lat_beyond_the_latitude_range_suggests_the_right_order(client):
+    # Los Angeles, longitude first: -118 can't be a latitude
+    response = client.get("/api/route/", {"start": "-118.2437,34.0522", "finish": CHICAGO})
+
+    error = error_of(response, 400, "INVALID_INPUT")
+    assert error["details"]["start"] == [
+        "Coordinates go latitude first (-90..90), then longitude: try '34.0522,-118.2437'."
+    ]
+
+
 def test_post_is_not_allowed(client):
     response = client.post("/api/route/", {"start": CHICAGO, "finish": LOS_ANGELES})
 
