@@ -134,7 +134,7 @@ At startup, every Station is loaded from SQLite into an in-memory KD-tree
 
 1. **View and cache** (`routing/views.py`). `RouteQuerySerializer` validates `start` and
    `finish`. `plan_trip_body` returns the cached plan if there is one (kept 24 h, keyed on
-   the normalised text). The API and the map page share this function, so opening the map
+   the normalised text plus the vehicle settings and OSRM server). The API and the map page share this function, so opening the map
    after calling the API costs nothing.
 2. **Resolve the locations** (`routing/services/locations.py`). Each input is parsed as
    `"lat,lng"`, or looked up as `"City, ST"` (`places.py`, Census data), or sent to
@@ -290,9 +290,11 @@ you have one.
   the Route, so a slightly cheaper Station can occasionally be missed.
 - **Static prices.** They come from the file, with no live prices, one fuel grade and one
   vehicle profile.
-- **The plan cache ignores vehicle settings.** It is keyed on `start` and `finish` only.
-  After you change `RANGE_MILES`, `MPG`, `MIN_RESERVE_MILES` or `CORRIDOR_MILES`, restart
-  the server (the default in-memory cache) or clear the cache.
+- **The plan cache ignores the price data.** It is keyed on `start`, `finish`, the vehicle
+  settings (`RANGE_MILES`, `MPG`, `MIN_RESERVE_MILES`, `CORRIDOR_MILES`) and
+  `OSRM_BASE_URL`, so changing those never serves an old plan. After reloading Stations
+  from a new price file, restart the server (the default in-memory cache) or clear the
+  cache.
 - **The default cache is per process.** Set `CACHE_URL` (e.g. `redis://…`) to share it
   between workers.
 - **Nominatim pacing is per process.** Nominatim calls are spaced at least 1 s apart within

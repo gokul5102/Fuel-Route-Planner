@@ -128,6 +128,52 @@ def test_a_different_trip_is_not_a_cache_hit(client, http):
     assert len(http.calls) == 2
 
 
+def nominatim_finds(http, query: str, lat: float, lon: float) -> None:
+    http.get(
+        NOMINATIM_URL,
+        match=[responses.matchers.query_param_matcher({"q": query}, strict_match=False)],
+        json=[{"lat": str(lat), "lon": str(lon), "address": {"ISO3166-2-lvl4": "US-IL"}}],
+    )
+
+
+@pytest.mark.usefixtures("stations")
+def test_text_that_only_looks_alike_once_joined_is_not_a_cache_hit(client, http):
+    """ "Chicago|x" to "Los Angeles" and "Chicago" to "x|Los Angeles" are different trips."""
+    nominatim_finds(http, "Chicago|x", 41.8781, -87.6298)
+    nominatim_finds(http, "Los Angeles", 34.0522, -118.2437)
+    nominatim_finds(http, "Chicago", 41.8781, -87.6298)
+    nominatim_finds(http, "x|Los Angeles", 34.0522, -118.2437)
+
+    plan(client, "Chicago|x", "Los Angeles")
+    other = plan(client, "Chicago", "x|Los Angeles")
+
+    assert other.json()["meta"]["cache"] == "miss"
+
+
+@pytest.mark.usefixtures("stations")
+@pytest.mark.parametrize(
+    ("setting", "value"),
+    [
+        ("RANGE_MILES", 400.0),
+        ("MPG", 8.0),
+        ("MIN_RESERVE_MILES", 20.0),
+        ("CORRIDOR_MILES", 5.0),
+        ("OSRM_BASE_URL", "https://other-osrm.test"),
+    ],
+)
+def test_changing_a_planning_setting_is_not_served_a_stale_plan(
+    client, http, settings, setting, value
+):
+    other_osrm_url = OSRM_URL.replace("osrm.test", "other-osrm.test")
+    http.get(other_osrm_url, json=json.loads(OSRM_FIXTURE.read_text()))
+    plan(client)
+    setattr(settings, setting, value)
+
+    again = plan(client)
+
+    assert again.json()["meta"]["cache"] == "miss"
+
+
 @pytest.mark.usefixtures("stations")
 def test_the_map_page_after_the_api_makes_no_external_calls(client, http):
     plan(client)

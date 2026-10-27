@@ -1,4 +1,6 @@
 import hashlib
+import json
+from dataclasses import asdict
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -19,7 +21,7 @@ from routing.api_docs import (
 from routing.errors import describe_error
 from routing.serializers import RouteQuerySerializer, serialize_trip_plan
 from routing.services import request_metrics
-from routing.services.planner import plan_trip
+from routing.services.planner import Vehicle, plan_trip
 
 
 def plan_trip_body(start: str, finish: str) -> tuple[dict, str]:
@@ -39,12 +41,20 @@ def plan_trip_body(start: str, finish: str) -> tuple[dict, str]:
 
 
 def plan_cache_key(start: str, finish: str) -> str:
-    """Case and runs of spaces don't matter: "Chicago,  IL" and "chicago, il" share a plan.
+    """One key per trip and planning setup.
 
-    The text is hashed so the key is safe for any cache backend (e.g. memcached).
+    Case and runs of spaces don't matter: "Chicago,  IL" and "chicago, il" share a plan.
+    The vehicle settings and the OSRM server are part of the key, so changing them never
+    serves a plan made with the old ones. The parts go in as a JSON list (so "A|B" to "C"
+    and "A" to "B|C" stay apart), hashed so the key is safe for any cache backend.
     """
-    normalised = "|".join(" ".join(text.lower().split()) for text in (start, finish))
-    return "plan:" + hashlib.sha256(normalised.encode()).hexdigest()
+    parts = [
+        " ".join(start.lower().split()),
+        " ".join(finish.lower().split()),
+        asdict(Vehicle.from_settings()),
+        settings.OSRM_BASE_URL,
+    ]
+    return "plan:" + hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
 
 
 def map_url(request, start: str, finish: str) -> str:
