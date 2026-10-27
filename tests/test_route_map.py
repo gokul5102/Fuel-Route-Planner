@@ -104,3 +104,11 @@ def test_the_route_lines_are_simplified_so_the_response_stays_small(client, stat
     chosen, alternative = features_of(response.json()["map"]["geojson"], "route")
     assert 500 < len(chosen["geometry"]["coordinates"]) < 22_416 / 5
     assert 500 < len(alternative["geometry"]["coordinates"]) < 21_139 / 5
+
+
+def test_map_url_is_the_absolute_map_page_link_for_the_same_trip(client, stations, osrm):
+    body = plan(client).json()
+
+    assert body["map"]["url"] == (
+        "http://testserver/api/route/map/?start=41.8781%2C-87.6298&finish=34.0522%2C-118.2437"
+    )
