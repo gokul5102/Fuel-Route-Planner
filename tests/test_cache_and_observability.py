@@ -192,6 +192,22 @@ def test_changing_a_planning_setting_is_not_served_a_stale_plan(
 
 
 @pytest.mark.usefixtures("stations")
+def test_new_station_prices_are_not_served_a_stale_plan(client, http):
+    # A shared cache (e.g. Redis) outlives a restart; a reload with new prices must miss.
+    from routing.models import Station
+    from routing.services.station_index import reset_station_index
+
+    first = plan(client).json()
+    Station.objects.filter(opis_id=102).update(price_per_gallon="2.999")
+    reset_station_index()  # what a restart does after `make load`
+
+    again = plan(client).json()
+
+    assert again["meta"]["cache"] == "miss"
+    assert again["total_fuel_cost"] < first["total_fuel_cost"]
+
+
+@pytest.mark.usefixtures("stations")
 def test_the_map_page_after_the_api_makes_no_external_calls(client, http):
     plan(client)
 

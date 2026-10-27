@@ -37,6 +37,11 @@ class Vehicle:
         )
 
     @property
+    def start_zone_miles(self) -> float:
+        """The Start zone is as long as the Corridor is wide."""
+        return self.corridor_miles
+
+    @property
     def tank_gallons(self) -> float:
         return self.range_miles / self.mpg
 
@@ -131,6 +136,7 @@ def plan_route(route: RoutedPath, index: StationIndex, vehicle: Vehicle) -> Rout
             route.points,
             index,
             corridor_miles=vehicle.corridor_miles,
+            start_zone_miles=vehicle.start_zone_miles,
             route_miles=route.distance_miles,
             start_at_nearest_station=True,  # the tank starts empty
         )

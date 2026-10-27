@@ -134,6 +134,6 @@ def _assumptions(vehicle: Vehicle) -> dict:
         "starting_fuel": "empty",
         "reserve_miles": vehicle.reserve_miles,
         "corridor_miles": vehicle.corridor_miles,
-        "start_zone_miles": vehicle.corridor_miles,
+        "start_zone_miles": vehicle.start_zone_miles,
         "station_locations": "city-level; the detour to reach a Station is ignored",
     }

@@ -137,6 +137,8 @@ def test_the_map_page_draws_the_same_plan_with_leaflet(client, stations, osrm):
     # Referrer-Policy strips it, so the tile layer must ask for one explicitly.
     assert "tile.openstreetmap.org" in html
     assert 'referrerPolicy: "strict-origin-when-cross-origin"' in html
+    # Leaflet inserts tooltip strings as HTML, so the typed place names go in as text nodes
+    assert ".bindTooltip(element(" in html
     # the trip form suggests "City, ST" from the local places endpoint
     assert 'role="combobox"' in html
     assert '"/api/places/"' in html

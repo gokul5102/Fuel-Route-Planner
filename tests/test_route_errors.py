@@ -18,6 +18,9 @@ from django.http import Http404
 
 from routing.models import Station
 
+# Every plan reads the Station index (its fingerprint is part of the cache key).
+pytestmark = pytest.mark.django_db
+
 CHICAGO, LOS_ANGELES = "41.8781,-87.6298", "34.0522,-118.2437"
 OSRM_URL = "https://osrm.test/route/v1/driving/-87.6298,41.8781;-118.2437,34.0522"
 OSRM_FIXTURE = Path(__file__).parent / "fixtures" / "osrm_chicago_los_angeles.json"
@@ -101,14 +104,12 @@ def test_post_is_not_allowed(client):
     assert response["Allow"] == "GET, HEAD, OPTIONS"
 
 
-@pytest.mark.django_db
 def test_with_no_station_loaded_at_all_it_is_no_station_at_start(client, osrm):
     osrm.get(OSRM_URL, json=json.loads(OSRM_FIXTURE.read_text()))
 
     error_of(plan(client), 422, "NO_STATION_AT_START")
 
 
-@pytest.mark.django_db
 def test_a_far_away_station_is_where_the_trip_starts(client, osrm):
     osrm.get(OSRM_URL, json=json.loads(OSRM_FIXTURE.read_text()))
     add_station(1, "Iowa City", 41.655661, -91.530859)  # ~200 miles from Chicago, and no other
@@ -119,7 +120,6 @@ def test_a_far_away_station_is_where_the_trip_starts(client, osrm):
     assert error["details"] == {"mile_marker": 500.0}
 
 
-@pytest.mark.django_db
 def test_a_gap_beyond_the_range_is_unreachable_with_the_mile_marker_where_fuel_runs_out(
     client, osrm
 ):

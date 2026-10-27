@@ -31,6 +31,7 @@ from routing.services import request_metrics
 from routing.services.locations import normalise_query
 from routing.services.places import get_place_index
 from routing.services.planner import Vehicle, plan_trip
+from routing.services.station_index import get_station_index
 
 PLAN_BODY_VERSION = 3  # 2: unfuellable Routes left out of `alternatives`; 3: `on_route`
 
@@ -55,9 +56,10 @@ def plan_cache_key(start: str, finish: str) -> str:
     """One key per trip and planning setup.
 
     Case and runs of spaces don't matter: "Chicago,  IL" and "chicago, il" share a plan.
-    The vehicle settings and the OSRM server are part of the key, so changing them never
-    serves a plan made with the old ones. The parts go in as a JSON list (so "A|B" to "C"
-    and "A" to "B|C" stay apart), hashed so the key is safe for any cache backend.
+    The vehicle settings, the OSRM server and the Station data (prices and positions) are
+    part of the key, so changing any of them never serves a plan made with the old ones.
+    The parts go in as a JSON list (so "A|B" to "C" and "A" to "B|C" stay apart), hashed
+    so the key is safe for any cache backend.
     PLAN_BODY_VERSION changes whenever the body's shape does, so old cached bodies are ignored.
     """
     parts = [
@@ -66,6 +68,7 @@ def plan_cache_key(start: str, finish: str) -> str:
         normalise_query(finish),
         asdict(Vehicle.from_settings()),
         settings.OSRM_BASE_URL,
+        get_station_index().fingerprint,
     ]
     return "plan:" + hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
 

@@ -28,27 +28,31 @@ class NominatimError(Exception):
 
 
 MIN_INTERVAL_SECONDS = 1.0  # Nominatim usage policy: at most 1 request per second
-_last_call: float | None = None  # monotonic time of this process's latest request
+_next_turn = 0.0  # monotonic time from which this process may send its next request
 _pacing_lock = threading.Lock()
 
 
 def _wait_for_turn() -> None:
-    """Sleep until at least MIN_INTERVAL_SECONDS have passed since the previous request.
+    """Take the next free one-second slot and sleep until it comes.
 
-    The lock is held while sleeping, so concurrent callers queue up one second apart.
+    Concurrent callers get slots one second apart. A slot further away than
+    HTTP_TIMEOUT_SECONDS is refused (a Timeout), so a queue never makes a request wait
+    longer than the timeout promises.
     """
-    global _last_call
+    global _next_turn
     with _pacing_lock:
-        if _last_call is not None:
-            remaining = _last_call + MIN_INTERVAL_SECONDS - monotonic()
-            if remaining > 0:
-                sleep(remaining)
-        _last_call = monotonic()
+        now = monotonic()
+        turn = max(now, _next_turn)
+        if turn - now > settings.HTTP_TIMEOUT_SECONDS:
+            raise NominatimError("Too many geocoding requests queued") from requests.Timeout()
+        _next_turn = turn + MIN_INTERVAL_SECONDS
+    if turn > now:
+        sleep(turn - now)
 
 
 def search(query: str, country_code: str = "us") -> NominatimPlace | None:
     """Return the best match for `query` within one country, or None if nothing matches."""
-    _wait_for_turn()
+    _wait_for_turn()  # may raise NominatimError (a Timeout) when the queue is too long
     count_external_call()
     try:
         status, results = http.get_json(  # within HTTP_TIMEOUT_SECONDS in total

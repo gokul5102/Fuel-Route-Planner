@@ -94,7 +94,8 @@ def test_the_nearest_station_further_along_the_route_moves_to_mile_marker_zero()
         STRAIGHT_ROUTE, index, corridor_miles=8, start_at_nearest_station=True
     )
 
-    assert [(m.station.opis_id, m.mile_marker) for m in matches] == [(1, 0.0)]
+    # the truck starts there, and it is still a Station on the Route
+    assert [(m.station.opis_id, m.mile_marker, m.on_route) for m in matches] == [(1, 0.0, True)]
 
 
 def test_the_nearest_station_is_used_however_far_from_the_start_it_is():
@@ -102,6 +103,9 @@ def test_the_nearest_station_is_used_however_far_from_the_start_it_is():
     index = StationIndex.build([along_and_off(1, -300, 0)])  # 300 miles behind the start
 
     assert start_markers(index) == {1: 0}
+    assert not stations_in_corridor(
+        STRAIGHT_ROUTE, index, corridor_miles=8, start_at_nearest_station=True
+    )[0].on_route
 
 
 def test_a_station_near_the_finish_gets_the_last_mile_marker():

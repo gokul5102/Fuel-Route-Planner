@@ -92,11 +92,11 @@ def plan_fuel_stops(
     here, fuel = 0, 0.0  # index into stops_by_marker, miles of fuel in the tank
     while True:
         current = stops_by_marker[here]
-        in_range = [
-            i
-            for i in range(here + 1, len(stops_by_marker))
-            if stops_by_marker[i].mile_marker - current.mile_marker <= usable_range
-        ]
+        in_range = []  # Stations ahead within Range; sorted, so stop at the first beyond it
+        for i in range(here + 1, len(stops_by_marker)):
+            if stops_by_marker[i].mile_marker - current.mile_marker > usable_range:
+                break
+            in_range.append(i)
         cheaper = next((i for i in in_range if stops_by_marker[i].price < current.price), None)
         to_destination = distance_miles - current.mile_marker
 

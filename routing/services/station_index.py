@@ -6,6 +6,7 @@ scipy cKDTree, and the Station details sit in a parallel tuple (row i of the tre
 the database.
 """
 
+import hashlib
 import logging
 import threading
 from dataclasses import dataclass
@@ -33,6 +34,10 @@ class StationIndex:
     def __init__(self, stations: tuple[IndexedStation, ...], tree: cKDTree | None) -> None:
         self.stations = stations
         self._tree = tree
+        # Changes whenever a Station, price or position changes, so plan cache keys can
+        # include it and a reload with new prices never serves plans made with the old ones.
+        rows = sorted((s.opis_id, str(s.price), s.lat, s.lon) for s in stations)
+        self.fingerprint = hashlib.sha256(repr(rows).encode()).hexdigest()[:16]
 
     @classmethod
     def build(cls, stations: list[IndexedStation]) -> "StationIndex":

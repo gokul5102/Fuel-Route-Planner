@@ -10,6 +10,9 @@ import responses
 
 from tests.test_route_api import OSRM_FIXTURE, stations  # noqa: F401  (pytest fixture)
 
+# Every plan reads the Station index (its fingerprint is part of the cache key).
+pytestmark = pytest.mark.django_db
+
 # Census coordinates of "Chicago city", IL and "Los Angeles city", CA
 OSRM_CENSUS_URL = "https://osrm.test/route/v1/driving/-87.684939,41.837045;-118.410825,34.019394"
 

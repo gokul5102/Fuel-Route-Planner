@@ -74,6 +74,7 @@ class PlaceIndex:
         # (key, rank, name, state), sorted by key on first use so a prefix is a bisect away
         self._suggestions: list[tuple[str, int, str, str]] = []
         self._sorted = True
+        self._sort_lock = threading.Lock()  # requests may run suggest() on several threads
 
     def __len__(self) -> int:
         return len(self._coords)
@@ -129,8 +130,10 @@ class PlaceIndex:
         if not key:
             return []
         if not self._sorted:
-            self._suggestions.sort()
-            self._sorted = True
+            with self._sort_lock:  # list.sort leaves the list looking empty while it runs
+                if not self._sorted:
+                    self._suggestions.sort()
+                    self._sorted = True
         matches = []
         for entry in self._suggestions[bisect_left(self._suggestions, (key,)) :]:
             if not entry[0].startswith(key):

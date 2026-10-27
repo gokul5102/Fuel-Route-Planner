@@ -57,7 +57,7 @@ def nominatim_clock(monkeypatch):
     clock = FakeClock()
     monkeypatch.setattr("routing.services.nominatim.monotonic", clock.monotonic)
     monkeypatch.setattr("routing.services.nominatim.sleep", clock.sleep)
-    monkeypatch.setattr("routing.services.nominatim._last_call", None)
+    monkeypatch.setattr("routing.services.nominatim._next_turn", 0.0)
     return clock
 
 

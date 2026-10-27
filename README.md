@@ -323,17 +323,17 @@ you have one.
   the Route, so a slightly cheaper Station can occasionally be missed.
 - **Static prices.** They come from the file, with no live prices, one fuel grade and one
   vehicle profile.
-- **The plan cache ignores the price data.** It is keyed on `start`, `finish`, the vehicle
-  settings (`RANGE_MILES`, `MPG`, `MIN_RESERVE_MILES`, `CORRIDOR_MILES`) and
-  `OSRM_BASE_URL`, so changing those never serves an old plan. After reloading Stations
-  from a new price file, restart the server (the default in-memory cache) or clear the
-  cache.
+- **New prices need a restart.** The plan cache is keyed on `start`, `finish`, the vehicle
+  settings, `OSRM_BASE_URL` and a fingerprint of the Station data, so it never serves a plan
+  made with old prices, even from a shared cache. But each server process reads the
+  Stations once, at startup: after `make load` with a new price file, restart it.
 - **The default cache is per process.** Set `CACHE_URL` (e.g. `redis://…`) to share it
   between workers.
 - **Nominatim pacing is per process.** Nominatim calls are spaced at least 1 s apart within
   one server process (a request with two free-text places waits about 1 s for the second).
-  Several worker processes would each keep their own pace. Results are cached, which is
-  fine for a demo but not for heavy traffic.
+  A request whose turn would come later than `HTTP_TIMEOUT_SECONDS` fails at once with
+  `ROUTING_PROVIDER_TIMEOUT` instead of queueing. Several worker processes would each keep
+  their own pace. Results are cached, which is fine for a demo but not for heavy traffic.
 - **Unreachable places.** Hawaii and other places with no road to the start can't be
   planned (`NO_ROUTE`).
 - **Gaps in the price file.** Some Routes run longer than the Range between Stations in

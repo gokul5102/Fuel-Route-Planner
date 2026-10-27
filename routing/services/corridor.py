@@ -8,7 +8,8 @@
    OSRM's figure. Stations in the Start zone (the first `start_zone_miles`) are at
    Mile marker 0.
 4. The tank starts empty, so with no Station in the Start zone the Station nearest the
-   start, however far, is put at Mile marker 0: the truck is assumed to start there.
+   start, however far, is put at Mile marker 0: the truck is assumed to start there. It
+   keeps `on_route` if it is also in the Corridor further along.
 """
 
 from dataclasses import dataclass
@@ -26,9 +27,7 @@ LatLon = tuple[float, float]
 class CorridorStation:
     station: IndexedStation
     mile_marker: float
-    on_route: bool = (
-        True  # False for the Station nearest the start, used when the Start zone has none
-    )
+    on_route: bool = True  # False for an off-Corridor Station the truck is assumed to start at
 
 
 def resample(route: list[LatLon], step_miles: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
@@ -74,6 +73,7 @@ def stations_in_corridor(
 
     empty_start_zone = not any(match.mile_marker == 0 for match in matches)
     if start_at_nearest_station and empty_start_zone and (first := index.nearest(sample_points[0])):
+        in_corridor = any(m.station.opis_id == first.opis_id for m in matches)
         matches = [m for m in matches if m.station.opis_id != first.opis_id]
-        matches.append(CorridorStation(first, 0.0, on_route=False))
+        matches.append(CorridorStation(first, 0.0, on_route=in_corridor))
     return sorted(matches, key=lambda m: (m.mile_marker, m.station.opis_id))

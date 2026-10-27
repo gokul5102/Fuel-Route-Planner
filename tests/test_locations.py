@@ -248,6 +248,21 @@ def test_nominatim_calls_are_spaced_at_least_one_second_apart(http, nominatim_cl
     assert len(http.calls) == 3
 
 
+def test_a_queue_longer_than_the_timeout_fails_fast_instead_of_waiting(
+    http, nominatim_clock, settings, monkeypatch
+):
+    settings.HTTP_TIMEOUT_SECONDS = 2
+    # five geocodes already queued ahead, one second apart: this one's turn is 5 s away
+    monkeypatch.setattr("routing.services.nominatim._next_turn", nominatim_clock.now + 5)
+
+    with pytest.raises(GeocodingFailed) as error:
+        resolve_location("Willis Tower")
+
+    assert error.value.code == "ROUTING_PROVIDER_TIMEOUT"
+    assert nominatim_clock.sleeps == []
+    assert len(http.calls) == 0
+
+
 def test_a_census_place_outside_the_usa_outline_is_rejected_without_any_http_call(http):
     """The Census list includes Puerto Rico, but the outline (like "18.46,-66.10") excludes it."""
     with pytest.raises(LocationOutsideUSA):
