@@ -3,6 +3,8 @@
 OSRM is mocked: with the recorded Chicago -> Los Angeles Route (2,018.03 miles), or to fail.
 """
 
+import io
+import itertools
 import json
 from decimal import Decimal
 from pathlib import Path
@@ -142,6 +144,43 @@ def test_osrm_failing_is_a_routing_provider_error(client, osrm, failure):
 )
 def test_osrm_timing_out_is_a_routing_provider_timeout(client, osrm, timeout):
     osrm.get(OSRM_URL, body=timeout)
+
+    error_of(plan(client), 504, "ROUTING_PROVIDER_TIMEOUT")
+
+
+def test_osrm_taking_longer_than_the_limit_in_total_is_a_routing_provider_timeout(
+    client, osrm, settings, monkeypatch
+):
+    # Every single read is fast, but the clock says the whole download has taken 10.5 s.
+    settings.HTTP_TIMEOUT_SECONDS = 10
+    clock = itertools.chain([1000.0], itertools.repeat(1010.5))
+    monkeypatch.setattr("routing.services.osrm.monotonic", lambda: next(clock))
+    osrm.get(OSRM_URL, json=json.loads(OSRM_FIXTURE.read_text()))
+
+    error = error_of(plan(client), 504, "ROUTING_PROVIDER_TIMEOUT")
+
+    assert "10 s" in error["message"]
+
+
+class StallingBody(io.RawIOBase):
+    """A response body that sends a few bytes, then times out (as a socket read would)."""
+
+    def __init__(self) -> None:
+        self.sent = False
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, buffer) -> int:
+        if self.sent:
+            raise TimeoutError("timed out")
+        self.sent = True
+        buffer[:9] = b'{"code":"'
+        return 9
+
+
+def test_osrm_stalling_in_the_middle_of_the_body_is_a_routing_provider_timeout(client, osrm):
+    osrm.get(OSRM_URL, body=io.BufferedReader(StallingBody()))
 
     error_of(plan(client), 504, "ROUTING_PROVIDER_TIMEOUT")
 
