@@ -321,6 +321,49 @@
             "description": "Anything that is not \"lat,lng\" or a known \"City, ST\" goes to Nominatim (1 extra call, cached for 30 days)."
           },
           "response": []
+        },
+        {
+          "name": "Place suggestions (autocomplete)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Chicago, IL is the first suggestion\", () => {",
+                  "    pm.expect(pm.response.json().results[0].label).to.eql(\"Chicago, IL\");",
+                  "});",
+                  "pm.test(\"made 0 external call(s)\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"X-External-Calls\")).to.eql(\"0\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/places/?q=chic",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "places",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "chic"
+                }
+              ]
+            },
+            "description": "\"City, ST\" suggestions from the local Census file, as the map page's From/To fields use them. Add \", ST\" to narrow by state, e.g. q=springfield, mo."
+          },
+          "response": []
         }
       ]
     },
@@ -371,6 +414,50 @@
               ]
             },
             "description": "Toronto resolves locally to a point outside the USA."
+          },
+          "response": []
+        },
+        {
+          "name": "Coordinates in the wrong order (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"the right order is suggested\", () => {",
+                  "    pm.expect(pm.response.json().error.details.did_you_mean).to.eql(\"41.8781,-87.6298\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/route/?start=-87.6298,41.8781&finish=Denver, CO",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "route",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "start",
+                  "value": "-87.6298,41.8781"
+                },
+                {
+                  "key": "finish",
+                  "value": "Denver, CO"
+                }
+              ]
+            },
+            "description": "Chicago written longitude first lands outside the USA; the error suggests latitude first."
           },
           "response": []
         },
