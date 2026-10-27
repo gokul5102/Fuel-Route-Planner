@@ -25,9 +25,7 @@ class Command(BaseCommand):
 
         with transaction.atomic():
             Station.objects.all().delete()
-            Station.objects.bulk_create(
-                Station(**vars(station)) for station in cleaned.stations
-            )
+            Station.objects.bulk_create(Station(**vars(station)) for station in cleaned.stations)
 
         elapsed = time.perf_counter() - started
         self.stdout.write(
