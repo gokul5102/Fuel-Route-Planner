@@ -7,8 +7,11 @@ the fuel price file and the Census files still match, e.g. "SAINT LOUIS" and
 
 import csv
 import re
+import threading
 import unicodedata
 from pathlib import Path
+
+from django.conf import settings
 
 LatLon = tuple[float, float]
 
@@ -62,3 +65,17 @@ class PlaceIndex:
             for row in csv.DictReader(f):
                 index.add(row["name"], row["state"], float(row["lat"]), float(row["lon"]))
         return index
+
+
+_index: PlaceIndex | None = None
+_lock = threading.Lock()
+
+
+def get_place_index() -> PlaceIndex:
+    """The shared US places index, loaded from `US_PLACES_FILE` on first use (~0.1 s)."""
+    global _index
+    if _index is None:
+        with _lock:
+            if _index is None:
+                _index = PlaceIndex.from_csv(settings.US_PLACES_FILE)
+    return _index

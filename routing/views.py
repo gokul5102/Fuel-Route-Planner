@@ -8,15 +8,22 @@ from routing.services.planner import plan_trip
 
 
 class RouteView(APIView):
-    """Plan the cheapest Fuel stops between two places."""
+    """Plan the cheapest Fuel stops between two places.
+
+    Failures are raised, not caught here: routing.errors turns each into the error envelope.
+    """
 
     authentication_classes = []
     permission_classes = []
 
     @extend_schema(
         parameters=[
-            OpenApiParameter("start", str, required=True, description='"lat,lng"'),
-            OpenApiParameter("finish", str, required=True, description='"lat,lng"'),
+            OpenApiParameter(
+                "start", str, required=True, description='"lat,lng", "City, ST" or a US address'
+            ),
+            OpenApiParameter(
+                "finish", str, required=True, description='"lat,lng", "City, ST" or a US address'
+            ),
         ],
         responses=OpenApiTypes.OBJECT,
     )

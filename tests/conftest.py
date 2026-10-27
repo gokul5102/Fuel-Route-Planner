@@ -30,3 +30,13 @@ def _fresh_station_index():
     reset_station_index()
     yield
     reset_station_index()
+
+
+@pytest.fixture(autouse=True)
+def _empty_cache():
+    """Each test starts with an empty cache, so cached geocodes never leak between tests."""
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()

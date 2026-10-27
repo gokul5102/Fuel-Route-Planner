@@ -9,7 +9,7 @@ from decimal import Decimal
 from django.conf import settings
 
 from routing.services.corridor import stations_in_corridor
-from routing.services.locations import ResolvedLocation, resolve_location
+from routing.services.locations import ResolvedLocation, check_distinct, resolve_location
 from routing.services.optimizer import CandidateStation, plan_fuel_stops
 from routing.services.osrm import RoutedPath, fetch_routes
 from routing.services.station_index import IndexedStation, StationIndex, get_station_index
@@ -70,6 +70,7 @@ def plan_trip(start_query: str, finish_query: str) -> TripPlan:
     vehicle = Vehicle.from_settings()
     start = resolve_location(start_query)
     finish = resolve_location(finish_query)
+    check_distinct(start, finish)
     routes = fetch_routes((start.lat, start.lon), (finish.lat, finish.lon))
     plan = plan_route(routes[0], get_station_index(), vehicle)
     return TripPlan(start, finish, plan, vehicle)
