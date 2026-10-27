@@ -188,3 +188,34 @@ def test_cities_census_cannot_match_fall_back_to_nominatim_one_per_second(
     assert sleeps == [1.0]  # a pause before every Nominatim call after the first
     assert "nominatim: 2" in out.getvalue()
     assert "50.0% of US cities" in out.getvalue()
+
+
+@responses.activate
+def test_cities_nominatim_cannot_find_are_recorded_as_unresolved(data_dir, settings):
+    settings.NOMINATIM_USER_AGENT = "test-agent/1.0"
+    write_prices(settings, ("Smithtown", "NY"), ("Atlantis", "TX"))
+    nominatim_answers("Atlantis, TX", "us", [])
+    out = io.StringIO()
+
+    call_command("build_city_coords", stdout=out)
+
+    assert read_csv(settings.CITY_COORDS_FILE)[0] == {
+        "city": "Atlantis",
+        "state": "TX",
+        "lat": "",
+        "lon": "",
+        "source": "unresolved",
+    }
+    assert "unresolved: 1" in out.getvalue()
+
+
+@responses.activate
+def test_a_failed_nominatim_request_is_left_out_so_the_next_run_retries_it(data_dir, settings):
+    write_prices(settings, ("Smithtown", "NY"), ("Tiny Spot", "TX"))
+    responses.get(NOMINATIM_SEARCH, status=503)
+    out = io.StringIO()
+
+    call_command("build_city_coords", stdout=out)
+
+    assert [r["city"] for r in read_csv(settings.CITY_COORDS_FILE)] == ["Smithtown"]
+    assert "1 Nominatim request(s) failed" in out.getvalue()

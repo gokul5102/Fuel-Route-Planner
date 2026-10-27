@@ -81,26 +81,38 @@ class Command(BaseCommand):
 
         price_rows = read_price_file_cities(settings.PRICE_FILE)
         self.nominatim_calls = 0
+        self.failed = 0
         with open(settings.CITY_COORDS_FILE, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(CITY_COORDS_COLUMNS)
             for city, state in sorted(price_rows):
-                coords, source = self.locate(index, city, state)
-                writer.writerow([city, state, *coords, source])
+                try:
+                    lat, lon, source = self.locate(index, city, state)
+                except nominatim.NominatimError as exc:
+                    # Not written, so the next run retries it (no retries within a run).
+                    self.failed += 1
+                    self.stderr.write(f"Nominatim failed for {city}, {state}: {exc}")
+                    continue
+                writer.writerow([city, state, lat, lon, source])
                 f.flush()  # an interrupted run keeps every city written so far
 
         self.print_summary(price_rows)
+        if self.failed:
+            self.stdout.write(f"{self.failed} Nominatim request(s) failed; re-run to retry them")
 
-    def locate(self, index: PlaceIndex, city: str, state: str):
+    def locate(self, index: PlaceIndex, city: str, state: str) -> tuple:
+        """Return (lat, lon, source); lat and lon are "" when the city is unresolved."""
         coords = index.find(city, state)
         if coords:
-            return coords, "census"
+            return *coords, "census"
         if self.nominatim_calls:
             time.sleep(NOMINATIM_INTERVAL_SECONDS)
         self.nominatim_calls += 1
         country = "ca" if state in CANADIAN_PROVINCES else "us"
         coords = nominatim.search(f"{city}, {state}", country_code=country)
-        return coords, "nominatim"
+        if coords is None:
+            return "", "", "unresolved"
+        return *coords, "nominatim"
 
     def print_summary(self, price_rows: Counter[tuple[str, str]]) -> None:
         with open(settings.CITY_COORDS_FILE, newline="", encoding="utf-8") as f:
