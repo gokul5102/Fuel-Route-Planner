@@ -55,7 +55,6 @@ def test_the_geojson_has_the_chosen_route_and_its_alternative_as_lines(client, s
         "distance_miles": 2018.03,
         "duration_hours": 35.36,
         "total_fuel_cost": 717.34,
-        "failure_code": None,
     }
     assert alternative["properties"]["chosen"] is False
     assert alternative["properties"]["distance_miles"] == 2124.37

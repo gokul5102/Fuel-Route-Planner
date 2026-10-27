@@ -21,6 +21,7 @@
 
   .summary .total { margin: 2px 0 4px; font-size: 36px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
   .summary .facts { color: var(--muted); }
+  .summary .facts span { white-space: nowrap; }  /* wrap between facts, never inside one */
   .summary .facts span + span::before { content: "·"; padding: 0 6px; color: var(--faint); }
 
   .section h2 { margin-bottom: 10px; }
@@ -283,12 +284,8 @@
     label.append(element("div", "", chosen ? "Cheapest Route" : "Alternative " + i),
                  element("div", "meta", miles(summary.distance_miles) + " · " + hours(summary.duration_hours)));
     const fuel = element("div");
-    if (summary.total_fuel_cost === null) {
-      fuel.append(element("div", "delta", "can't be fuelled"));
-    } else {
-      fuel.append(element("div", "price", usd.format(summary.total_fuel_cost)));
-      if (!chosen) fuel.append(element("div", "delta", "+" + usd.format(summary.total_fuel_cost - plan.total_fuel_cost)));
-    }
+    fuel.append(element("div", "price", usd.format(summary.total_fuel_cost)));
+    if (!chosen) fuel.append(element("div", "delta", "+" + usd.format(summary.total_fuel_cost - plan.total_fuel_cost)));
     row.append(element("span", "swatch" + (chosen ? "" : " alternative")), label, fuel);
     const entry = routeLayers.find((r) => r.route.properties.chosen === chosen &&
                                           r.route.properties.distance_miles === summary.distance_miles);

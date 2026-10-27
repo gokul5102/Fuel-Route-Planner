@@ -76,7 +76,7 @@ class TripPlan:
     finish: ResolvedLocation
     plan: RoutePlan  # the chosen Route's plan
     vehicle: Vehicle
-    alternatives: list[RouteOption]  # the Routes not chosen, in OSRM's order
+    alternatives: list[RoutePlan]  # the other Routes that can be fuelled, in OSRM's order
 
 
 def plan_trip(start_query: str, finish_query: str) -> TripPlan:
@@ -93,12 +93,12 @@ def plan_trip(start_query: str, finish_query: str) -> TripPlan:
 
 def choose_cheapest_route(
     routes: list[RoutedPath], index: StationIndex, vehicle: Vehicle
-) -> tuple[RoutePlan, list[RouteOption]]:
+) -> tuple[RoutePlan, list[RoutePlan]]:
     """Plan every Route OSRM offered; the one with the cheapest fuel wins.
 
     Fuel costs within TIE_CENTS of the cheapest count as a tie, and the faster Route wins it.
-    Routes that cannot be fuelled are skipped; if none can, raises the fastest Route's failure.
-    Returns the winner's plan and the other Routes (the alternatives).
+    Routes that cannot be fuelled are dropped; if none can, raises the fastest Route's failure.
+    Returns the winner's plan and the other fuelled Routes' plans (the alternatives).
     """
     options = [_plan_option(route, index, vehicle) for route in routes]
     fuelled = [option for option in options if option.plan is not None]
@@ -106,7 +106,7 @@ def choose_cheapest_route(
         raise _fastest(options).failure
     cheapest = min(option.plan.total_cost for option in fuelled)
     winner = _fastest([o for o in fuelled if o.plan.total_cost - cheapest <= TIE_CENTS])
-    return winner.plan, [option for option in options if option is not winner]
+    return winner.plan, [option.plan for option in fuelled if option is not winner]
 
 
 def _fastest(options: list[RouteOption]) -> RouteOption:

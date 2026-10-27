@@ -73,17 +73,17 @@
       };
 
       async function lookUp() {
+        pending?.abort();  // an answer for older text must never replace the list for this text
         const query = input.value.trim();
         if (query.length < 2 || /^[-\d]/.test(query)) return close();  // nothing to suggest for "lat,lng"
         const key = query.toLowerCase();
         if (answers.has(key)) return show(answers.get(key));
-        pending?.abort();
         pending = new AbortController();
         try {
           const response = await fetch(endpoint + "?q=" + encodeURIComponent(query), { signal: pending.signal });
           const results = response.ok ? (await response.json()).results : [];
-          answers.set(key, results);
-          if (document.activeElement === input) show(results);
+          if (response.ok) answers.set(key, results);
+          if (document.activeElement === input && input.value.trim().toLowerCase() === key) show(results);
         } catch (error) {
           if (error.name !== "AbortError") close();
         }

@@ -32,6 +32,8 @@ from routing.services.locations import normalise_query
 from routing.services.places import get_place_index
 from routing.services.planner import Vehicle, plan_trip
 
+PLAN_BODY_VERSION = 2  # 2: unfuellable Routes left out of `alternatives`
+
 
 def plan_trip_body(start: str, finish: str) -> tuple[dict, str]:
     """The JSON body of a plan (without `map.url` and `meta`), and "hit" or "miss".
@@ -56,8 +58,10 @@ def plan_cache_key(start: str, finish: str) -> str:
     The vehicle settings and the OSRM server are part of the key, so changing them never
     serves a plan made with the old ones. The parts go in as a JSON list (so "A|B" to "C"
     and "A" to "B|C" stay apart), hashed so the key is safe for any cache backend.
+    PLAN_BODY_VERSION changes whenever the body's shape does, so old cached bodies are ignored.
     """
     parts = [
+        PLAN_BODY_VERSION,
         normalise_query(start),
         normalise_query(finish),
         asdict(Vehicle.from_settings()),

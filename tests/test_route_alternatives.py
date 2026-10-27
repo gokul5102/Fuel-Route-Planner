@@ -102,14 +102,11 @@ def test_the_route_not_chosen_is_summarised_with_its_fuel_cost(client, db, osrm)
             # 22.03 gal at $4.00 to reach Iowa City, then 179.773 gal at $3.50 = $717.3255;
             # each of its 8 stops is rounded to the cent, which adds up to $717.34
             "total_fuel_cost": 717.34,
-            "failure_code": None,
         }
     ]
 
 
-def test_a_route_that_cannot_be_fuelled_is_skipped_and_summarised_with_its_failure(
-    client, db, osrm
-):
+def test_a_route_that_cannot_be_fuelled_is_left_out(client, db, osrm):
     add_stations([CHICAGO_STATION], "4.00")
     add_stations(I80_STATIONS, "3.50")  # nothing on I-40: it runs dry at Mile marker 500
 
@@ -119,14 +116,10 @@ def test_a_route_that_cannot_be_fuelled_is_skipped_and_summarised_with_its_failu
     body = response.json()
     assert body["route"] == {"distance_miles": 2018.03, "duration_hours": 35.36}
     assert body["total_fuel_cost"] == 717.34
-    assert body["alternatives"] == [
-        {
-            "distance_miles": 2124.37,
-            "duration_hours": 37.26,
-            "total_fuel_cost": None,
-            "failure_code": "UNREACHABLE",
-        }
-    ]
+    # I-40 is not a real option, so it is neither listed nor drawn
+    assert body["alternatives"] == []
+    routes = [f for f in body["map"]["geojson"]["features"] if f["properties"]["kind"] == "route"]
+    assert len(routes) == 1
 
 
 # Hand-made OSRM responses on the Kansas/Nebraska plains, from (40.0, -100.0) to (40.0, -97.0).
@@ -186,7 +179,6 @@ def test_hand_made_the_slower_loop_wins_when_a_cheap_station_is_on_it(client, db
             "distance_miles": 160.0,
             "duration_hours": 2.5,
             "total_fuel_cost": 64.0,
-            "failure_code": None,
         }
     ]
 

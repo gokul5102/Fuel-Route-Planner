@@ -109,7 +109,6 @@ SAMPLE_PLAN = {
                         "distance_miles": 238.25,
                         "duration_hours": 4.25,
                         "total_fuel_cost": 65.82,
-                        "failure_code": None,
                     },
                 },
                 {

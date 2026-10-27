@@ -26,7 +26,7 @@ def trip_geojson(trip: TripPlan, route_summaries: list[dict], fuel_stops: list[d
     `trip.alternatives` order); `fuel_stops` are the body's Fuel stops. Reusing them keeps
     the map's properties identical to the body.
     """
-    routes = [trip.plan.route] + [option.route for option in trip.alternatives]
+    routes = [trip.plan.route] + [other.route for other in trip.alternatives]
     lines = [
         _route_line(route, summary, chosen=number == 0)
         for number, (route, summary) in enumerate(zip(routes, route_summaries, strict=True))

@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from routing.services.locations import COORDINATES, ResolvedLocation
 from routing.services.osrm import RoutedPath
-from routing.services.planner import PlannedStop, RouteOption, TripPlan, Vehicle
+from routing.services.planner import PlannedStop, RoutePlan, TripPlan, Vehicle
 from routing.services.route_map import trip_geojson
 
 
@@ -42,8 +42,8 @@ def _valid_coordinates_if_given(value: str) -> str:
 def serialize_trip_plan(trip: TripPlan) -> dict:
     plan = trip.plan
     fuel_stops = [_fuel_stop(stop) for stop in plan.stops]
-    alternatives = [_route_summary(option) for option in trip.alternatives]
-    chosen = _route_summary(RouteOption(plan.route, plan))
+    alternatives = [_route_summary(other) for other in trip.alternatives]
+    chosen = _route_summary(plan)
     return {
         "start": _location(trip.start),
         "finish": _location(trip.finish),
@@ -85,13 +85,9 @@ def _route(route: RoutedPath) -> dict:
     }
 
 
-def _route_summary(option: RouteOption) -> dict:
-    """A Route as a summary only: its fuel cost, or why it cannot be fuelled."""
-    return {
-        **_route(option.route),
-        "total_fuel_cost": float(option.plan.total_cost) if option.plan else None,
-        "failure_code": option.failure.code if option.failure else None,
-    }
+def _route_summary(plan: RoutePlan) -> dict:
+    """A Route as a summary only: its distance, duration and fuel cost."""
+    return {**_route(plan.route), "total_fuel_cost": float(plan.total_cost)}
 
 
 def _location(location: ResolvedLocation) -> dict:

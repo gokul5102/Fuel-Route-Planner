@@ -105,8 +105,8 @@ The fields work like this:
 - **`fuel_stops`:** the stops in driving order. The costs add up exactly, to the cent, to
   `total_fuel_cost`.
 - **`total_gallons`:** always the Route distance divided by MPG.
-- **`alternatives`:** the other Routes OSRM offered. Each has its distance, duration and fuel
-  cost, or a `failure_code` if it can't be fuelled.
+- **`alternatives`:** the other Routes OSRM offered, each with its distance, duration and fuel
+  cost. A Route that can't be fuelled (a gap longer than the Range) is left out.
 - **`map.geojson`:** the chosen Route and the alternatives as lines, plus the start, the
   finish and the numbered Fuel stops as points.
 
