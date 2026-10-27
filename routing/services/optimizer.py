@@ -44,9 +44,13 @@ class FuelPlan:
 
 
 class FuelPlanError(Exception):
-    """The trip cannot be fuelled. `code` is the API error code."""
+    """The trip cannot be fuelled. `code` is the API error code; `details` explains it."""
 
     code = "FUEL_PLAN_ERROR"
+
+    @property
+    def details(self) -> dict:
+        return {}
 
 
 class NoStationAtStart(FuelPlanError):
@@ -62,6 +66,10 @@ class Unreachable(FuelPlanError):
     def __init__(self, mile_marker: float) -> None:
         self.mile_marker = mile_marker
         super().__init__(f"The vehicle would run out of fuel at Mile marker {mile_marker:.1f}.")
+
+    @property
+    def details(self) -> dict:
+        return {"mile_marker": round(self.mile_marker, 1)}
 
 
 def plan_fuel_stops(
