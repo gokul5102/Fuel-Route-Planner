@@ -86,7 +86,6 @@ SAMPLE_PLAN = {
         "reserve_miles": 0.0,
         "corridor_miles": 8.0,
         "start_zone_miles": 8.0,
-        "start_station_miles": 50.0,
         "station_locations": "city-level; the detour to reach a Station is ignored",
     },
     "map": {
@@ -208,9 +207,9 @@ ERROR_EXAMPLES = {
             "No driving Route between the points: Impossible route between points",
             {"provider_code": "NoRoute"},
         ),
-        "No Station near the start": _error(
+        "No Station to start from": _error(
             "NO_STATION_AT_START",
-            "No Station near the start, so an empty tank cannot leave.",
+            "No Station to start from, so an empty tank cannot leave.",
         ),
         "Gap longer than the Range": _error(
             "UNREACHABLE",

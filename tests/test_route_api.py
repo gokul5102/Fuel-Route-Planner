@@ -169,7 +169,6 @@ def test_states_the_assumptions_behind_the_plan(client, stations, osrm):
         "reserve_miles": 0.0,
         "corridor_miles": 8.0,
         "start_zone_miles": 8.0,
-        "start_station_miles": 50.0,
         "station_locations": "city-level; the detour to reach a Station is ignored",
     }
 

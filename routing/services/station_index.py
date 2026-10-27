@@ -57,12 +57,12 @@ class StationIndex:
         hits = self._tree.query_ball_point(points, miles_to_chord(radius_miles))
         return sorted({row for rows in hits for row in rows})
 
-    def nearest(self, point: np.ndarray, within_miles: float) -> IndexedStation | None:
-        """The Station closest to the unit-vector `point`, if one is within `within_miles`."""
-        if self._tree is None or within_miles <= 0:
+    def nearest(self, point: np.ndarray) -> IndexedStation | None:
+        """The Station closest to the unit-vector `point` (None only when there are none)."""
+        if self._tree is None:
             return None
-        distance, row = self._tree.query(point, distance_upper_bound=miles_to_chord(within_miles))
-        return None if np.isinf(distance) else self.stations[row]
+        _, row = self._tree.query(point)
+        return self.stations[row]
 
 
 logger = logging.getLogger(__name__)

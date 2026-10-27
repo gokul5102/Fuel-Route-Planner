@@ -167,7 +167,7 @@
   const a = plan.assumptions;
   document.getElementById("assumptions").append(...[
     a.range_miles + "-mile Range at " + a.mpg + " MPG, starting with an empty tank: the first stop is in the first " +
-      a.start_zone_miles + " miles, or the Station nearest the start (up to " + a.start_station_miles + " miles away).",
+      a.start_zone_miles + " miles or, if there is none, the Station nearest the start, where the truck is assumed to begin.",
     "Stations within " + a.corridor_miles + " miles of the Route count as on it; Station locations are city-level.",
     "Each stop buys just enough to reach a cheaper Station, or fills up when none is in Range — so some stops are small top-ups.",
     "Planned on " + (plan.alternatives.length + 1) + " Route(s) from one OSRM call; the cheapest is shown.",
@@ -264,7 +264,7 @@
     const offRoute = awayFromStart > a.start_zone_miles;
     const name = element("div", "name", titleCase(stop.name));
     name.title = stop.name;
-    if (offRoute) name.append(element("span", "tag", "fill up first"));
+    if (offRoute) name.append(element("span", "tag", "trip starts here"));
     else if (stop.gallons < TOP_UP_GALLONS) name.append(element("span", "tag", "top-up"));
     const where = element("div");
     where.style.minWidth = "0";

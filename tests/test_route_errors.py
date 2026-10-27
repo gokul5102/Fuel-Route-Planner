@@ -92,11 +92,21 @@ def test_post_is_not_allowed(client):
 
 
 @pytest.mark.django_db
-def test_no_station_within_50_miles_of_the_start_is_no_station_at_start(client, osrm):
+def test_with_no_station_loaded_at_all_it_is_no_station_at_start(client, osrm):
     osrm.get(OSRM_URL, json=json.loads(OSRM_FIXTURE.read_text()))
-    add_station(1, "Iowa City", 41.655661, -91.530859)  # Mile marker 220, ~200 miles away
 
     error_of(plan(client), 422, "NO_STATION_AT_START")
+
+
+@pytest.mark.django_db
+def test_a_far_away_station_is_where_the_trip_starts(client, osrm):
+    osrm.get(OSRM_URL, json=json.loads(OSRM_FIXTURE.read_text()))
+    add_station(1, "Iowa City", 41.655661, -91.530859)  # ~200 miles from Chicago, and no other
+
+    # it is the start (Mile marker 0); with nothing after it fuel runs out 500 miles on
+    error = error_of(plan(client), 422, "UNREACHABLE")
+
+    assert error["details"] == {"mile_marker": 500.0}
 
 
 @pytest.mark.django_db
