@@ -122,13 +122,17 @@ def _find(query: str) -> ResolvedLocation:
     return ResolvedLocation(query, lat, lon, "nominatim")
 
 
+def normalise_query(query: str) -> str:
+    """The query as cache keys see it: case and runs of spaces don't matter."""
+    return " ".join(query.lower().split())
+
+
 def _geocode(query: str, state: str | None) -> tuple[float, float]:
     """Nominatim, through the cache. Only places that were found are cached.
 
     For a "City, ST" query, a match in another state does not count.
     """
-    normalised = " ".join(query.lower().split())
-    key = "geocode:" + hashlib.sha256(normalised.encode()).hexdigest()
+    key = "geocode:" + hashlib.sha256(normalise_query(query).encode()).hexdigest()
     cached = cache.get(key)
     if cached is not None:
         return cached

@@ -19,6 +19,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from routing.services import nominatim
+from routing.services.locations import CANADIAN_PROVINCES
 from routing.services.places import PlaceIndex
 
 GAZETTEER_URL = "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/"
@@ -26,7 +27,6 @@ PLACES_ZIP = "2024_Gaz_place_national.zip"
 COUSUBS_ZIP = "2024_Gaz_cousubs_national.zip"
 
 CITY_COORDS_COLUMNS = ["city", "state", "lat", "lon", "source"]
-CANADIAN_PROVINCES = {"AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"}
 
 
 def download_once(url: str, path: Path) -> None:

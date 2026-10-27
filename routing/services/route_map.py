@@ -10,7 +10,7 @@ import numpy as np
 
 from routing.services.locations import ResolvedLocation
 from routing.services.osrm import RoutedPath
-from routing.services.planner import PlannedStop, RoutePlan, TripPlan
+from routing.services.planner import TripPlan
 
 COORDINATE_DECIMALS = 5  # about 1 metre: plenty for drawing a line
 # A drawn Route line may stray this far from OSRM's road geometry. Fuel planning always uses
@@ -19,21 +19,23 @@ DISPLAY_TOLERANCE_MILES = 0.05  # about 80 metres, under a pixel at zoom 10
 MILES_PER_DEGREE_LATITUDE = 69.09
 
 
-def trip_geojson(trip: TripPlan) -> dict:
-    routes = [_route_line(trip.plan.route, trip.plan, chosen=True, failure_code=None)] + [
-        _route_line(
-            option.route,
-            option.plan,
-            chosen=False,
-            failure_code=option.failure.code if option.failure else None,
-        )
-        for option in trip.alternatives
+def trip_geojson(trip: TripPlan, route_summaries: list[dict], fuel_stops: list[dict]) -> dict:
+    """The map of a plan, built around the dicts the JSON body already shows.
+
+    `route_summaries` are the chosen Route's summary then the alternatives' (in
+    `trip.alternatives` order); `fuel_stops` are the body's Fuel stops. Reusing them keeps
+    the map's properties identical to the body.
+    """
+    routes = [trip.plan.route] + [option.route for option in trip.alternatives]
+    lines = [
+        _route_line(route, summary, chosen=number == 0)
+        for number, (route, summary) in enumerate(zip(routes, route_summaries, strict=True))
     ]
-    stops = [_fuel_stop_point(number, stop) for number, stop in enumerate(trip.plan.stops, 1)]
+    stops = [_fuel_stop_point(number, stop) for number, stop in enumerate(fuel_stops, 1)]
     return {
         "type": "FeatureCollection",
         "features": [
-            *routes,
+            *lines,
             _location_point("start", trip.start),
             _location_point("finish", trip.finish),
             *stops,
@@ -45,23 +47,14 @@ def _feature(geometry: dict, properties: dict) -> dict:
     return {"type": "Feature", "geometry": geometry, "properties": properties}
 
 
-def _route_line(
-    route: RoutedPath, plan: RoutePlan | None, chosen: bool, failure_code: str | None
-) -> dict:
+def _route_line(route: RoutedPath, summary: dict, chosen: bool) -> dict:
     coordinates = [
         [round(lon, COORDINATE_DECIMALS), round(lat, COORDINATE_DECIMALS)]
         for lat, lon in simplify(route.points, DISPLAY_TOLERANCE_MILES)
     ]
     return _feature(
         {"type": "LineString", "coordinates": coordinates},
-        {
-            "kind": "route",
-            "chosen": chosen,
-            "distance_miles": round(route.distance_miles, 2),
-            "duration_hours": round(route.duration_hours, 2),
-            "total_fuel_cost": float(plan.total_cost) if plan else None,
-            "failure_code": failure_code,
-        },
+        {"kind": "route", "chosen": chosen, **summary},
     )
 
 
@@ -72,23 +65,12 @@ def _location_point(kind: str, location: ResolvedLocation) -> dict:
     )
 
 
-def _fuel_stop_point(number: int, stop: PlannedStop) -> dict:
-    station = stop.station
+def _fuel_stop_point(number: int, stop: dict) -> dict:
+    """A body Fuel stop as a Point; its lat and lon go in the geometry, not the properties."""
+    details = {field: value for field, value in stop.items() if field not in ("lat", "lon")}
     return _feature(
-        {"type": "Point", "coordinates": [station.lon, station.lat]},
-        {
-            "kind": "fuel_stop",
-            "number": number,
-            "station_id": station.opis_id,
-            "name": station.name,
-            "address": station.address,
-            "city": station.city,
-            "state": station.state,
-            "price_per_gallon": float(station.price),
-            "mile_marker": round(stop.mile_marker, 1),
-            "gallons": round(stop.gallons, 3),
-            "cost": float(stop.cost),
-        },
+        {"type": "Point", "coordinates": [stop["lon"], stop["lat"]]},
+        {"kind": "fuel_stop", "number": number, **details},
     )
 
 

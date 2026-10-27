@@ -21,6 +21,7 @@ from routing.api_docs import (
 from routing.errors import describe_error
 from routing.serializers import RouteQuerySerializer, serialize_trip_plan, with_queries
 from routing.services import request_metrics
+from routing.services.locations import normalise_query
 from routing.services.planner import Vehicle, plan_trip
 
 
@@ -49,8 +50,8 @@ def plan_cache_key(start: str, finish: str) -> str:
     and "A" to "B|C" stay apart), hashed so the key is safe for any cache backend.
     """
     parts = [
-        " ".join(start.lower().split()),
-        " ".join(finish.lower().split()),
+        normalise_query(start),
+        normalise_query(finish),
         asdict(Vehicle.from_settings()),
         settings.OSRM_BASE_URL,
     ]

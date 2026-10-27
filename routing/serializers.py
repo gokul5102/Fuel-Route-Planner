@@ -35,16 +35,19 @@ def _valid_coordinates_if_given(value: str) -> str:
 
 def serialize_trip_plan(trip: TripPlan) -> dict:
     plan = trip.plan
+    fuel_stops = [_fuel_stop(stop) for stop in plan.stops]
+    alternatives = [_route_summary(option) for option in trip.alternatives]
+    chosen = _route_summary(RouteOption(plan.route, plan))
     return {
         "start": _location(trip.start),
         "finish": _location(trip.finish),
         "route": _route(plan.route),
-        "fuel_stops": [_fuel_stop(stop) for stop in plan.stops],
+        "fuel_stops": fuel_stops,
         "total_gallons": round(plan.total_gallons, 3),
         "total_fuel_cost": float(plan.total_cost),
-        "alternatives": [_alternative(option) for option in trip.alternatives],
+        "alternatives": alternatives,
         "assumptions": _assumptions(trip.vehicle),
-        "map": {"geojson": trip_geojson(trip)},
+        "map": {"geojson": trip_geojson(trip, [chosen, *alternatives], fuel_stops)},
     }
 
 
@@ -76,8 +79,8 @@ def _route(route: RoutedPath) -> dict:
     }
 
 
-def _alternative(option: RouteOption) -> dict:
-    """A Route not chosen, as a summary only: its fuel cost, or why it cannot be fuelled."""
+def _route_summary(option: RouteOption) -> dict:
+    """A Route as a summary only: its fuel cost, or why it cannot be fuelled."""
     return {
         **_route(option.route),
         "total_fuel_cost": float(option.plan.total_cost) if option.plan else None,
