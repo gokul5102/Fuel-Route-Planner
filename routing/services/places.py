@@ -24,6 +24,15 @@ PLACE_TYPE_SUFFIX = re.compile(
     re.IGNORECASE,
 )
 PARENTHETICAL = re.compile(r"\s*\(.*\)")
+# A consolidated city-county is named after both, e.g. "Nashville-Davidson metropolitan
+# government (balance)", "Macon-Bibb County", "Butte-Silver Bow (balance)"; people say
+# "Nashville", "Macon", "Butte". So the part before the "-" or "/" is indexed too.
+CONSOLIDATED_CITY = re.compile(r"^([^-/]+)[-/].*(county|government|\(balance\))$", re.IGNORECASE)
+# Census names that no rule turns into the name people use.
+EVERYDAY_NAMES = {
+    ("Urban Honolulu CDP", "HI"): "Honolulu",
+    ("Boise City city", "ID"): "Boise",
+}
 
 
 def place_key(name: str) -> str:
@@ -47,11 +56,18 @@ class PlaceIndex:
     def add(self, name: str, state: str, lat: float, lon: float) -> None:
         """Index a Census place name, with and without its place-type suffix.
 
-        The first place added under a key wins, so add higher-priority files first.
+        A consolidated city-county is also indexed under its city's name, and a few
+        places under their EVERYDAY_NAMES. The first place added under a key wins, so add
+        higher-priority files first.
         """
-        name = PARENTHETICAL.sub("", name)
         state = state.strip().upper()
-        for variant in {name, PLACE_TYPE_SUFFIX.sub("", name)}:
+        short_name = PARENTHETICAL.sub("", name)
+        variants = {short_name, PLACE_TYPE_SUFFIX.sub("", short_name)}
+        if consolidated := CONSOLIDATED_CITY.match(name):
+            variants.add(consolidated[1])
+        if everyday_name := EVERYDAY_NAMES.get((name, state)):
+            variants.add(everyday_name)
+        for variant in variants:
             self._coords.setdefault((place_key(variant), state), (lat, lon))
 
     def find(self, city: str, state: str) -> LatLon | None:

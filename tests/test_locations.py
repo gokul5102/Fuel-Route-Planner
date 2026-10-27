@@ -53,6 +53,29 @@ def test_city_lookup_uses_the_station_data_normalisation(http):
     assert resolve_location("  SAINT LOUIS ,mo ").lat == resolve_location("St. Louis, MO").lat
 
 
+@pytest.mark.parametrize(
+    ("query", "census_point"),
+    [
+        # Consolidated city-counties: "Nashville-Davidson metropolitan government (balance)"
+        ("Nashville, TN", (36.1718, -86.785002)),
+        ("Lexington, KY", (38.040678, -84.458272)),  # "Lexington-Fayette urban county"
+        ("Augusta, GA", (33.365531, -82.073422)),
+        ("Athens, GA", (33.949597, -83.370088)),
+        ("Macon, GA", (32.80899, -83.69406)),  # "Macon-Bibb County"
+        ("Butte, MT", (45.896232, -112.660071)),  # "Butte-Silver Bow (balance)"
+        # Census names no rule turns into the everyday name
+        ("Honolulu, HI", (21.324347, -157.84764)),  # "Urban Honolulu CDP"
+        ("Boise, ID", (43.599335, -116.229817)),  # "Boise City city"
+    ],
+)
+def test_big_cities_with_unusual_census_names_resolve_locally(http, query, census_point):
+    location = resolve_location(query)
+
+    assert (location.lat, location.lon) == census_point
+    assert location.resolved_by == "census"
+    assert len(http.calls) == 0
+
+
 def test_a_canadian_province_is_outside_the_usa_without_any_http_call(http):
     with pytest.raises(LocationOutsideUSA) as error:
         resolve_location("Toronto, ON")

@@ -56,7 +56,9 @@ Then try one of these:
 
 1. `"lat,lng"`, for example `41.8781,-87.6298`. Parsed locally, with no external call.
 2. `"City, ST"`, for example `Chicago, IL`. Looked up in a local Census places file, with
-   no external call.
+   no external call. Consolidated city-counties are found by their city's name (Census
+   calls Nashville "Nashville-Davidson metropolitan government (balance)"), and so are
+   Honolulu and Boise.
 3. Any other US address or place, for example `233 S Wacker Dr, Chicago, IL`. Sent to
    Nominatim (one call), and the result is cached for 30 days.
 
