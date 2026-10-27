@@ -6,12 +6,11 @@ from django.core.cache import cache
 from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_GET
-from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from routing.api_docs import ROUTE_QUERY_PARAMETERS
+from routing.api_docs import ROUTE_QUERY_PARAMETERS, ROUTE_RESPONSES
 from routing.errors import describe_error
 from routing.serializers import RouteQuerySerializer, serialize_trip_plan
 from routing.services import request_metrics
@@ -57,7 +56,7 @@ class RouteView(APIView):
     authentication_classes = []
     permission_classes = []
 
-    @extend_schema(parameters=ROUTE_QUERY_PARAMETERS, responses=OpenApiTypes.OBJECT)
+    @extend_schema(parameters=ROUTE_QUERY_PARAMETERS, responses=ROUTE_RESPONSES)
     def get(self, request):
         query = RouteQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
