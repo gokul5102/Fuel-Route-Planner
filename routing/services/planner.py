@@ -14,6 +14,8 @@ from routing.services.optimizer import CandidateStation, FuelPlanError, plan_fue
 from routing.services.osrm import RoutedPath, fetch_routes
 from routing.services.station_index import IndexedStation, StationIndex, get_station_index
 
+TIE_CENTS = Decimal("0.01")  # Routes whose fuel costs differ by at most this are a tie
+
 
 @dataclass(frozen=True)
 class Vehicle:
@@ -91,15 +93,21 @@ def choose_cheapest_route(
 ) -> tuple[RoutePlan, list[RouteOption]]:
     """Plan every Route OSRM offered; the one with the cheapest fuel wins.
 
+    Fuel costs within TIE_CENTS of the cheapest count as a tie, and the faster Route wins it.
     Routes that cannot be fuelled are skipped; if none can, raises the fastest Route's failure.
     Returns the winner's plan and the other Routes (the alternatives).
     """
     options = [_plan_option(route, index, vehicle) for route in routes]
     fuelled = [option for option in options if option.plan is not None]
     if not fuelled:
-        raise min(options, key=lambda option: option.route.duration_hours).failure
-    winner = min(fuelled, key=lambda option: option.plan.total_cost)
+        raise _fastest(options).failure
+    cheapest = min(option.plan.total_cost for option in fuelled)
+    winner = _fastest([o for o in fuelled if o.plan.total_cost - cheapest <= TIE_CENTS])
     return winner.plan, [option for option in options if option is not winner]
+
+
+def _fastest(options: list[RouteOption]) -> RouteOption:
+    return min(options, key=lambda option: option.route.duration_hours)
 
 
 def _plan_option(route: RoutedPath, index: StationIndex, vehicle: Vehicle) -> RouteOption:

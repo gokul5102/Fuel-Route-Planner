@@ -126,3 +126,110 @@ def test_a_route_that_cannot_be_fuelled_is_skipped_and_summarised_with_its_failu
             "failure_code": "UNREACHABLE",
         }
     ]
+
+
+# Hand-made OSRM responses on the Kansas/Nebraska plains, from (40.0, -100.0) to (40.0, -97.0).
+# DIRECT runs straight east. NORTH_LOOP goes 34.5 miles north first, east along latitude 40.5,
+# then back south; the Northern Station on it is about 45 miles in and 34 miles off DIRECT.
+# Each test declares the distance and duration OSRM reports for each Route.
+START, FINISH = "40.0,-100.0", "40.0,-97.0"
+DIRECT = [(40.0, -100.0), (40.0, -97.0)]
+NORTH_LOOP = [(40.0, -100.0), (40.5, -100.0), (40.5, -97.0), (40.0, -97.0)]
+START_STATION = (1, "Start", "KS", 40.0, -100.0)
+NORTHERN_STATION = (2, "Northern", "NE", 40.5, -99.8)
+
+
+def osrm_route(points, miles: float, hours: float) -> dict:
+    return {
+        "geometry": {"type": "LineString", "coordinates": [[lon, lat] for lat, lon in points]},
+        "distance": miles * 1609.344,
+        "duration": hours * 3600,
+        "legs": [],
+        "weight": hours * 3600,
+        "weight_name": "routability",
+    }
+
+
+@pytest.fixture
+def osrm_offers(settings):
+    """Mock OSRM to offer the given Routes, in that order."""
+    settings.OSRM_BASE_URL = "https://osrm.test"
+    with responses.RequestsMock() as mock:
+
+        def offer(*routes):
+            mock.get(
+                "https://osrm.test/route/v1/driving/-100.0,40.0;-97.0,40.0",
+                json={"code": "Ok", "routes": list(routes), "waypoints": []},
+            )
+
+        yield offer
+
+
+def plan_hand_made(client):
+    return client.get("/api/route/", {"start": START, "finish": FINISH})
+
+
+def test_hand_made_the_slower_loop_wins_when_a_cheap_station_is_on_it(client, db, osrm_offers):
+    add_stations([START_STATION], "4.00")
+    add_stations([NORTHERN_STATION], "2.00")
+    osrm_offers(osrm_route(DIRECT, 160, 2.5), osrm_route(NORTH_LOOP, 230, 3.5))
+
+    body = plan_hand_made(client).json()
+
+    assert body["route"] == {"distance_miles": 230.0, "duration_hours": 3.5}
+    assert [stop["station_id"] for stop in body["fuel_stops"]] == [1, 2]
+    assert body["total_fuel_cost"] == 55.13  # ~4.6 gal at $4.00, then ~18.4 gal at $2.00
+    assert body["alternatives"] == [
+        # only the Start Station is on DIRECT: 16 gal at $4.00
+        {
+            "distance_miles": 160.0,
+            "duration_hours": 2.5,
+            "total_fuel_cost": 64.0,
+            "failure_code": None,
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    ("slower_miles", "slower_cost"),
+    [
+        (160.0, 64.00),  # the same cost
+        (159.975, 63.99),  # one cent cheaper is still a tie
+    ],
+)
+def test_a_tie_within_a_cent_goes_to_the_faster_route(
+    client, db, osrm_offers, slower_miles, slower_cost
+):
+    add_stations([START_STATION], "4.00")  # every gallon costs $4.00 on both Routes
+    osrm_offers(osrm_route(NORTH_LOOP, slower_miles, 3.0), osrm_route(DIRECT, 160, 2.5))
+
+    body = plan_hand_made(client).json()
+
+    assert body["route"] == {"distance_miles": 160.0, "duration_hours": 2.5}
+    assert body["total_fuel_cost"] == 64.0
+    assert body["alternatives"][0]["total_fuel_cost"] == slower_cost
+
+
+def test_two_cents_cheaper_is_not_a_tie(client, db, osrm_offers):
+    add_stations([START_STATION], "4.00")
+    osrm_offers(osrm_route(NORTH_LOOP, 159.95, 3.0), osrm_route(DIRECT, 160, 2.5))
+
+    body = plan_hand_made(client).json()
+
+    assert body["route"] == {"distance_miles": 159.95, "duration_hours": 3.0}
+    assert body["total_fuel_cost"] == 63.98
+
+
+def test_when_every_route_fails_the_fastest_routes_failure_is_returned(client, db, osrm_offers):
+    add_stations([START_STATION, NORTHERN_STATION], "4.00")
+    # DIRECT runs dry at Mile marker 500. NORTH_LOOP, the faster though OSRM lists it second,
+    # refills at the Northern Station (Mile marker 138.9 once scaled to 700 miles) and runs dry
+    # 500 miles after it.
+    osrm_offers(osrm_route(DIRECT, 600, 9.0), osrm_route(NORTH_LOOP, 700, 8.0))
+
+    response = plan_hand_made(client)
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "UNREACHABLE"
+    assert error["details"] == {"mile_marker": 638.9}
