@@ -119,7 +119,7 @@ def _fuel_stop(stop: PlannedStop) -> dict:
         "lat": station.lat,
         "lon": station.lon,
         "price_per_gallon": float(station.price),
-        "mile_marker": round(stop.mile_marker, 1),
+        "mile_marker": round(stop.mile_marker, 2),
         "gallons": round(stop.gallons, 3),
         "cost": float(stop.cost),
         "on_route": stop.on_route,

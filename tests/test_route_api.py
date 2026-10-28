@@ -93,11 +93,11 @@ def test_plans_the_cheapest_fuel_stops_from_chicago_to_los_angeles(client, stati
     ] == [
         (102, 0.0, 22.03, 85.89),  # cheapest at the start; just enough to reach $3.30 Iowa City
         (104, 220.3, 50.0, 165.0),  # nothing cheaper in Range: fill up, go to Omaha
-        (106, 471.6, 7.277, 25.11),  # just enough to top up for $3.20 Ogallala
-        (107, 793.1, 50.0, 160.0),  # fill up, go to the cheapest in Range (Grand Junction)
-        (109, 1243.7, 17.391, 63.48),  # just enough to top up for $3.40 Richfield
-        (110, 1467.0, 50.0, 170.0),  # fill up, go to Cedar City
-        (112, 1579.1, 5.106, 18.12),  # Los Angeles is in Range: just enough to arrive
+        (106, 471.64, 7.277, 25.11),  # just enough to top up for $3.20 Ogallala
+        (107, 793.07, 50.0, 160.0),  # fill up, go to the cheapest in Range (Grand Junction)
+        (109, 1243.68, 17.391, 63.48),  # just enough to top up for $3.40 Richfield
+        (110, 1466.98, 50.0, 170.0),  # fill up, go to Cedar City
+        (112, 1579.13, 5.106, 18.12),  # Los Angeles is in Range: just enough to arrive
     ]
     assert body["total_gallons"] == 201.803  # 2,018.03 miles / 10 MPG
     assert all(stop["on_route"] for stop in body["fuel_stops"])  # Chicago is in the Start zone

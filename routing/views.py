@@ -33,7 +33,7 @@ from routing.services.places import get_place_index
 from routing.services.planner import Vehicle, plan_trip
 from routing.services.station_index import get_station_index
 
-PLAN_BODY_VERSION = 3  # 2: unfuellable Routes left out of `alternatives`; 3: `on_route`
+PLAN_BODY_VERSION = 4  # 2: unfuellable Routes dropped; 3: `on_route`; 4: 2-decimal Mile markers
 
 
 def plan_trip_body(start: str, finish: str) -> tuple[dict, str]:

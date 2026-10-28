@@ -83,7 +83,7 @@ GeoJSON features are left out here:
      "on_route": true},
     {"station_id": 63669, "name": "One9 #1248", "address": "I-45, EXIT 271",
      "city": "Wilmer", "state": "TX", "lat": 32.599015, "lon": -96.681585,
-     "price_per_gallon": 2.75566666, "mile_marker": 16.0, "gallons": 22.228, "cost": 61.25,
+     "price_per_gallon": 2.75566666, "mile_marker": 15.97, "gallons": 22.228, "cost": 61.25,
      "on_route": true}
   ],
   "total_gallons": 23.825,
